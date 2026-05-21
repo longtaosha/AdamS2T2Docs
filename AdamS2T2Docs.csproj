@@ -286,6 +286,7 @@
     <Compile Include="FormCaption.Designer.cs">
       <DependentUpon>FormCaption.cs</DependentUpon>
     </Compile>
+    <Compile Include="QwenProofreader.cs" />
     <Compile Include="WinTeamDataSet.cs" />
     <Compile Include="SilenceGenerator.cs" />
     <Compile Include="ConnectToGoogle.cs" />

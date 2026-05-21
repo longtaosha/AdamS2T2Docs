@@ -37,7 +37,14 @@ namespace AdamS2T2Docs
         private string googleDocsID;
         private string copyWordgglID;
         private string language;
-        private string filter_cn; 
+        private string filter_cn;
+
+        private string qwenApiKey;
+        private string qwenBaseUrl;
+        private string qwenModel;
+        private bool isAiProofreadEnabled = true;
+        private QwenProofreader qwenProofreader;
+        private readonly SemaphoreSlim _aiSemaphore = new SemaphoreSlim(1, 1);
 
         private string googleDocsIDForFakeTyping;
         private static string uri;
@@ -97,8 +104,12 @@ namespace AdamS2T2Docs
                 loadApiKey();
                 xunFeiEncription = new XunFeiEncription(appid, apiKey);
                 connectToGoogle = new ConnectToGoogle(googleDocsID, typeEffect, copyWordgglID);
-                //connectToGoogleForFakeTyping = new ConnectToGoogle(googleDocsIDForFakeTyping);
+                //connectToGoogleForFakeTyping = new ConnectToGoogle(googleDocsIDForFakeTyping);               
 
+                qwenProofreader = new QwenProofreader(
+                    qwenApiKey,
+                    qwenBaseUrl,
+                    qwenModel);
 
                 //connectSqlString = "SERVER= 115.28.210.53; DATABASE= s2t2docsscript;" +
                 //  "USER= root; port=3306; PASSWORD= @f22bBfb@; SslMode = none";
@@ -276,12 +287,28 @@ namespace AdamS2T2Docs
 
                             currentSpeaker = result[4]; */
 
+                            string finalText = result[1];
+                            File.AppendAllText("logs/qwen-proofread.txt", DateTime.Now + "\nRAW: " + finalText + "\n");
+                            if (isAiProofreadEnabled && qwenProofreader != null)
+                            {
+                                await _aiSemaphore.WaitAsync();
+                                try
+                                {
+                                    finalText = await qwenProofreader.ProofreadAsync(finalText);
+                                }
+                                finally
+                                {
+                                    _aiSemaphore.Release();
+                                }
+                            }
+                            File.AppendAllText("logs/qwen-proofread.txt",  "AI : " + finalText + "\n\n");
+
                             richTextBox1?.Invoke(new Action(() =>
                             {
                                 //richTextBox1.SelectedText = "";
                                 //richTextBox1.AppendText(result[1]);
                                 //richTextBox1.SelectedText = result[4]+": "+result[1];//testing speaker indentification
-                                richTextBox1.SelectedText = result[1];
+                                richTextBox1.SelectedText = finalText;
                                 richTextBox1.DeselectAll();
                             }));
 
@@ -303,13 +330,13 @@ namespace AdamS2T2Docs
                             {
                                 if (isOutputGoogleJustFinalResult)
                                 {
-                                    await connectToGoogle.connectFinalResultAsync(0, result[1]);
+                                    await connectToGoogle.connectFinalResultAsync(0, finalText);
                                 }
                                 else
                                 {
                                     try
                                     {
-                                        await connectToGoogle.connectOnlyWaitFinalAsync(0, result[1], isToNewLineForGoogle);
+                                        await connectToGoogle.connectOnlyWaitFinalAsync(0, finalText, isToNewLineForGoogle);
                                     }
                                     catch (Exception eGoogle)
                                     {
@@ -435,8 +462,10 @@ namespace AdamS2T2Docs
                 googleDocsID = d.googleDocsID;
                 copyWordgglID = d.copyWordgglID;
                 language = d.language;
-                filter_cn = d.filter_cn; 
-
+                filter_cn = d.filter_cn;
+                qwenApiKey = d.qwenApiKey;
+                qwenBaseUrl = d.qwenBaseUrl;
+                qwenModel = d.qwenModel;
 
             }
             catch (Exception e)
