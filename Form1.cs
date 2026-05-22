@@ -45,6 +45,11 @@ namespace AdamS2T2Docs
         private bool isAiProofreadEnabled = true;
         private QwenProofreader qwenProofreader;
         private readonly SemaphoreSlim _aiSemaphore = new SemaphoreSlim(1, 1);
+        private string _proofreadContext = "";
+        private const int ProofreadContextMaxChars = 300;
+        private string _pendingShortFinalText = "";
+        private const int ShortFragmentWordThreshold = 5;
+
 
         private string googleDocsIDForFakeTyping;
         private static string uri;
@@ -288,13 +293,76 @@ namespace AdamS2T2Docs
                             currentSpeaker = result[4]; */
 
                             string finalText = result[1];
+                            int wordCount = CountWordsForProofread(finalText);
+                            // 短 fragment：先暂存，等待下一段
+                            if (wordCount > 0 &&
+                                wordCount < ShortFragmentWordThreshold &&
+                                string.IsNullOrWhiteSpace(_pendingShortFinalText))
+                            {
+                                _pendingShortFinalText = finalText;
+                                return;
+                            }
+                            // pending short
+                            if (!string.IsNullOrWhiteSpace(_pendingShortFinalText))
+                            {
+                                string pendingText = _pendingShortFinalText;
+                                _pendingShortFinalText = "";
+
+                                string lookaheadContext = _proofreadContext + pendingText + finalText;
+
+                                File.AppendAllText("logs/qwen-proofread.txt",
+                                    DateTime.Now + "\nRAW_PENDING: " + pendingText + "\nLOOKAHEAD: " + finalText + "\n");
+
+                                if (isAiProofreadEnabled && qwenProofreader != null)
+                                {
+                                    await _aiSemaphore.WaitAsync();
+                                    try
+                                    {                                        
+                                        var pendingProof = await qwenProofreader.ProofreadAsync(pendingText, lookaheadContext);
+                                        pendingText = pendingProof.CorrectedText;
+                                    }
+                                    finally
+                                    {
+                                        _aiSemaphore.Release();
+                                    }
+                                }
+
+                                File.AppendAllText("logs/qwen-proofread.txt",
+                                    "AI_PENDING : " + pendingText + "\n\n");
+
+                                richTextBox1?.Invoke(new Action(() =>
+                                {
+                                    richTextBox1.SelectedText = pendingText;
+                                    richTextBox1.DeselectAll();
+                                }));
+
+                                _proofreadContext += pendingText;
+
+                                if (_proofreadContext.Length > ProofreadContextMaxChars)
+                                {
+                                    _proofreadContext = _proofreadContext.Substring(
+                                        _proofreadContext.Length - ProofreadContextMaxChars);
+                                }
+
+                                if (!isGoogleError && isOutputGoogleJustFinalResult)
+                                {
+                                    await connectToGoogle.connectFinalResultAsync(0, pendingText);
+                                }
+                            }
+                            // end of pending short
+
+
                             File.AppendAllText("logs/qwen-proofread.txt", DateTime.Now + "\nRAW: " + finalText + "\n");
                             if (isAiProofreadEnabled && qwenProofreader != null)
                             {
                                 await _aiSemaphore.WaitAsync();
                                 try
-                                {
-                                    finalText = await qwenProofreader.ProofreadAsync(finalText);
+                                {                                    
+                                    var proof = await qwenProofreader.ProofreadAsync(
+    finalText,
+    _proofreadContext);
+
+                                    finalText = proof.CorrectedText;
                                 }
                                 finally
                                 {
@@ -324,6 +392,14 @@ namespace AdamS2T2Docs
                             //adamCommand.ExecuteNonQuery();
                             isToNewLineForGoogle = isToNewLine;
                             isToNewLine = true;
+
+                            _proofreadContext += finalText;
+
+                            if (_proofreadContext.Length > ProofreadContextMaxChars)
+                            {
+                                _proofreadContext = _proofreadContext.Substring(
+                                    _proofreadContext.Length - ProofreadContextMaxChars);
+                            }
 
 
                             if (!isGoogleError)
@@ -441,7 +517,24 @@ namespace AdamS2T2Docs
 
 
 
+        private int CountWordsForProofread(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return 0;
 
+            string cleaned = text.Trim();
+
+            char[] separators = new char[]
+            {
+        ' ', '\t', '\r', '\n',
+        '.', ',', '?', '!', ';', ':',
+        '，', '。', '？', '！', '；', '：'
+            };
+
+            string[] words = cleaned.Split(separators, StringSplitOptions.RemoveEmptyEntries);
+
+            return words.Length;
+        }
 
 
         private void loadApiKey()
