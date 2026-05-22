@@ -53,7 +53,7 @@ namespace AdamS2T2Docs
         private string _currentBusyStage = "Idle";
         private DateTime _currentBusyStageStart = DateTime.MinValue;
         private readonly object _busyStageLock = new object();
-        private readonly Queue<string> _pendingGoogleDocsQueue = new Queue<string>();
+        private readonly LinkedList<string> _pendingGoogleDocsQueue = new LinkedList<string>();
         private readonly object _pendingGoogleDocsQueueLock = new object();
         private bool _isGoogleDocsWorkerRunning = false;
 
@@ -137,6 +137,7 @@ namespace AdamS2T2Docs
                 {
                     string stage;
                     DateTime start;
+                    int queueCount;
 
                     lock (_busyStageLock)
                     {
@@ -144,14 +145,29 @@ namespace AdamS2T2Docs
                         start = _currentBusyStageStart;
                     }
 
+                    lock (_pendingGoogleDocsQueueLock)
+                    {
+                        queueCount = _pendingGoogleDocsQueue.Count;
+                    }
+
                     if (stage == "Idle")
                     {
-                        labelStatus.Text = "Idle"; 
+                        labelStatus.Text = "Idle | Q=" + queueCount;
                     }
                     else
                     {
                         var seconds = (DateTime.Now - start).TotalSeconds;
-                        labelStatus.Text = "Busy: " + stage + " " + seconds.ToString("0.0") + "s";
+
+                        labelStatus.Text =
+                            "Busy: " + stage + " " +
+                            seconds.ToString("0.0") + "s" +
+                            " | Q=" + queueCount;
+                    }
+
+                    // auto restart worker if queue exists
+                    if (queueCount > 0 && !_isGoogleDocsWorkerRunning)
+                    {
+                        _ = ProcessGoogleDocsQueueAsync();
                     }
                 };
                 monitorTimer.Start();
@@ -491,69 +507,86 @@ namespace AdamS2T2Docs
                                 string docsText = docsRawText;
                                 _googleDocsProofreadBuffer = "";
 
-                                ProofreadResult docsProof = null;
-
-                                if (isAiProofreadEnabled && qwenProofreader != null)
+                                lock (_pendingGoogleDocsQueueLock)
                                 {
-                                    await _aiSemaphore.WaitAsync();
+                                    _pendingGoogleDocsQueue.AddLast(docsRawText);
+
+                                    File.AppendAllText(
+                                        "logs/googleQueue.txt",
+                                        DateTime.Now +
+                                        " ENQUEUE len=" + docsRawText.Length +
+                                        " queue=" + _pendingGoogleDocsQueue.Count + "\n");
+                                }
+
+                                _ = ProcessGoogleDocsQueueAsync();
+                                /*
+// Temporarily disabled:
+// AI proofreading + Google Docs writing will be moved to a background worker.
+
+                            ProofreadResult docsProof = null;
+
+                            if (isAiProofreadEnabled && qwenProofreader != null)
+                            {
+                                await _aiSemaphore.WaitAsync();
+                                try
+                                {
                                     try
                                     {
-                                        try
-                                        {
-                                            docsProof = await qwenProofreader.ProofreadAsync(
-                                                docsText,
-                                                _proofreadContext);
-                                        }
-                                        finally
-                                        {
-                                            ClearBusyStage("Qwen Proofread");
-                                        }
+                                        docsProof = await qwenProofreader.ProofreadAsync(
+                                            docsText,
+                                            _proofreadContext);
                                     }
                                     finally
                                     {
-                                        _aiSemaphore.Release();
+                                        ClearBusyStage("Qwen Proofread");
                                     }
-
-                                    docsText = docsProof.CorrectedText;
+                                }
+                                finally
+                                {
+                                    _aiSemaphore.Release();
                                 }
 
-                                File.AppendAllText("logs/qwen-proofread-docs-buffer.txt",
-                                DateTime.Now + "\n" +
-                                "DOCS_RAW: " + docsRawText + "\n" +
-                                "DOCS_AI : " + docsText + "\n\n");
+                                docsText = docsProof.CorrectedText;
+                            }
 
-                                if (!isGoogleError)
+                            File.AppendAllText("logs/qwen-proofread-docs-buffer.txt",
+                            DateTime.Now + "\n" +
+                            "DOCS_RAW: " + docsRawText + "\n" +
+                            "DOCS_AI : " + docsText + "\n\n");
+
+                            if (!isGoogleError)
+                            {
+                                try
                                 {
+                                    SetBusyStage("Google Docs Append");
                                     try
                                     {
-                                        SetBusyStage("Google Docs Append");
-                                        try
-                                        {
-                                            await connectToGoogle.connectFinalResultAsync(0, docsText);
-                                        }
-                                        finally
-                                        {
-                                            ClearBusyStage("Google Docs Append");
-                                        }
+                                        await connectToGoogle.connectFinalResultAsync(0, docsText);
                                     }
-                                    catch (TaskCanceledException ex)
+                                    finally
                                     {
-                                        _googleDocsProofreadBuffer = docsText + _googleDocsProofreadBuffer;
-
-                                        File.AppendAllText("logs/googleErrors.txt",
-                                            DateTime.Now + "\nGoogle Docs timeout/canceled, requeued docsText:\n" +
-                                            docsText + "\n" +
-                                            ex.Message + "\n" + ex.StackTrace + "\n\n");
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        //isGoogleError = true;
-
-                                        File.AppendAllText("logs/googleErrors.txt",
-                                            DateTime.Now + "\nGoogle Docs error:\n" +
-                                            ex.Message + "\n" + ex.StackTrace + "\n\n");
+                                        ClearBusyStage("Google Docs Append");
                                     }
                                 }
+                                catch (TaskCanceledException ex)
+                                {
+                                    _googleDocsProofreadBuffer = docsText + _googleDocsProofreadBuffer;
+
+                                    File.AppendAllText("logs/googleErrors.txt",
+                                        DateTime.Now + "\nGoogle Docs timeout/canceled, requeued docsText:\n" +
+                                        docsText + "\n" +
+                                        ex.Message + "\n" + ex.StackTrace + "\n\n");
+                                }
+                                catch (Exception ex)
+                                {
+                                    //isGoogleError = true;
+
+                                    File.AppendAllText("logs/googleErrors.txt",
+                                        DateTime.Now + "\nGoogle Docs error:\n" +
+                                        ex.Message + "\n" + ex.StackTrace + "\n\n");
+                                }
+                            }
+                                */
                             }
 
                             //mySqlConnection.Close();
@@ -694,6 +727,113 @@ namespace AdamS2T2Docs
                 DateTime.Now + " EXIT " + stage + " elapsed=" + elapsed.TotalMilliseconds.ToString("0") + "ms\n");
         }
 
+        private async Task ProcessGoogleDocsQueueAsync()
+        {
+            if (_isGoogleDocsWorkerRunning)
+                return;
+
+            _isGoogleDocsWorkerRunning = true;
+
+            try
+            {
+                while (true)
+                {
+                    string docsRawText = null;
+
+                    lock (_pendingGoogleDocsQueueLock)
+                    {
+                        if (_pendingGoogleDocsQueue.Count > 0)
+                        {
+                            docsRawText = _pendingGoogleDocsQueue.First.Value;
+                            _pendingGoogleDocsQueue.RemoveFirst();
+
+                            File.AppendAllText(
+                                "logs/googleQueue.txt",
+                                DateTime.Now +
+                                " DEQUEUE len=" + docsRawText.Length +
+                                " queue=" + _pendingGoogleDocsQueue.Count + "\n");
+                        }
+                    }
+
+                    if (string.IsNullOrWhiteSpace(docsRawText))
+                        break;
+
+                    string docsText = docsRawText;
+                    ProofreadResult docsProof = null;
+
+                    if (isAiProofreadEnabled && qwenProofreader != null)
+                    {
+                        await _aiSemaphore.WaitAsync();
+                        try
+                        {
+                            SetBusyStage("Qwen Proofread");
+                            try
+                            {
+                                docsProof = await qwenProofreader.ProofreadAsync(
+                                    docsText,
+                                    _proofreadContext);
+                            }
+                            finally
+                            {
+                                ClearBusyStage("Qwen Proofread");
+                            }
+                        }
+                        finally
+                        {
+                            _aiSemaphore.Release();
+                        }
+
+                        docsText = docsProof.CorrectedText;
+                    }
+
+                    File.AppendAllText("logs/qwen-proofread-docs-buffer.txt",
+                        DateTime.Now + "\n" +
+                        "DOCS_RAW: " + docsRawText + "\n" +
+                        "DOCS_AI : " + docsText + "\n\n");
+
+                    try
+                    {
+                        SetBusyStage("Google Docs Append");
+                        try
+                        {
+                            Task googleTask = connectToGoogle.connectFinalResultAsync(0, docsText);
+                            Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(5));
+
+                            Task completedTask = await Task.WhenAny(googleTask, timeoutTask);
+
+                            if (completedTask == timeoutTask)
+                            {
+                                throw new TimeoutException("Google Docs append timed out after 5 seconds.");
+                            }
+
+                            await googleTask;
+                        }
+                        finally
+                        {
+                            ClearBusyStage("Google Docs Append");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        lock (_pendingGoogleDocsQueueLock)
+                        {
+                            _pendingGoogleDocsQueue.AddFirst(docsRawText);
+                        }
+
+                        File.AppendAllText("logs/googleErrors.txt",
+                            DateTime.Now + "\nGoogle Docs queue write failed, requeued to front:\n" +
+                            docsRawText + "\n" +
+                            ex.Message + "\n" + ex.StackTrace + "\n\n");
+
+                        break;
+                    }
+                }
+            }
+            finally
+            {
+                _isGoogleDocsWorkerRunning = false;
+            }
+        }
         private void loadApiKey()
         {
             try
