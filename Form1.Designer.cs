@@ -57,6 +57,7 @@ namespace AdamS2T2Docs
             this.tabPage1 = new System.Windows.Forms.TabPage();
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.buttonCaption = new System.Windows.Forms.Button();
+            this.labelStatus = new System.Windows.Forms.Label();
             this.audioSourceGroupBox.SuspendLayout();
             this.groupBox1.SuspendLayout();
             this.languageGroupBox.SuspendLayout();
@@ -71,11 +72,11 @@ namespace AdamS2T2Docs
             this.richTextBox1.Font = new System.Drawing.Font("Arial", 14.1F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.richTextBox1.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
             this.richTextBox1.HideSelection = false;
-            this.richTextBox1.Location = new System.Drawing.Point(4, 2);
-            this.richTextBox1.Margin = new System.Windows.Forms.Padding(2, 33, 2, 16);
+            this.richTextBox1.Location = new System.Drawing.Point(9, 4);
+            this.richTextBox1.Margin = new System.Windows.Forms.Padding(5, 74, 5, 36);
             this.richTextBox1.Name = "richTextBox1";
             this.richTextBox1.ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Vertical;
-            this.richTextBox1.Size = new System.Drawing.Size(767, 289);
+            this.richTextBox1.Size = new System.Drawing.Size(1790, 645);
             this.richTextBox1.TabIndex = 0;
             this.richTextBox1.Text = "";
             this.richTextBox1.Click += new System.EventHandler(this.richTextBox1_Click);
@@ -83,10 +84,10 @@ namespace AdamS2T2Docs
             // startRecordButton
             // 
             this.startRecordButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.startRecordButton.Location = new System.Drawing.Point(62, 449);
-            this.startRecordButton.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.startRecordButton.Location = new System.Drawing.Point(145, 1002);
+            this.startRecordButton.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.startRecordButton.Name = "startRecordButton";
-            this.startRecordButton.Size = new System.Drawing.Size(70, 31);
+            this.startRecordButton.Size = new System.Drawing.Size(163, 69);
             this.startRecordButton.TabIndex = 3;
             this.startRecordButton.Text = "start";
             this.startRecordButton.UseVisualStyleBackColor = true;
@@ -95,10 +96,10 @@ namespace AdamS2T2Docs
             // stopRecordButton
             // 
             this.stopRecordButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.stopRecordButton.Location = new System.Drawing.Point(475, 449);
-            this.stopRecordButton.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.stopRecordButton.Location = new System.Drawing.Point(1108, 1002);
+            this.stopRecordButton.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.stopRecordButton.Name = "stopRecordButton";
-            this.stopRecordButton.Size = new System.Drawing.Size(72, 31);
+            this.stopRecordButton.Size = new System.Drawing.Size(168, 69);
             this.stopRecordButton.TabIndex = 4;
             this.stopRecordButton.Text = "stop";
             this.stopRecordButton.UseVisualStyleBackColor = true;
@@ -109,11 +110,11 @@ namespace AdamS2T2Docs
             this.audioSourceGroupBox.BackColor = System.Drawing.Color.MistyRose;
             this.audioSourceGroupBox.Controls.Add(this.audioFromSysCheckBox);
             this.audioSourceGroupBox.Controls.Add(this.audioFromMicCheckBox);
-            this.audioSourceGroupBox.Location = new System.Drawing.Point(136, 342);
-            this.audioSourceGroupBox.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.audioSourceGroupBox.Location = new System.Drawing.Point(317, 763);
+            this.audioSourceGroupBox.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.audioSourceGroupBox.Name = "audioSourceGroupBox";
-            this.audioSourceGroupBox.Padding = new System.Windows.Forms.Padding(2, 2, 2, 2);
-            this.audioSourceGroupBox.Size = new System.Drawing.Size(248, 98);
+            this.audioSourceGroupBox.Padding = new System.Windows.Forms.Padding(5, 4, 5, 4);
+            this.audioSourceGroupBox.Size = new System.Drawing.Size(579, 219);
             this.audioSourceGroupBox.TabIndex = 6;
             this.audioSourceGroupBox.TabStop = false;
             this.audioSourceGroupBox.Text = "Audio Source";
@@ -123,10 +124,10 @@ namespace AdamS2T2Docs
             // 
             this.audioFromSysCheckBox.AutoSize = true;
             this.audioFromSysCheckBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.audioFromSysCheckBox.Location = new System.Drawing.Point(16, 67);
-            this.audioFromSysCheckBox.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.audioFromSysCheckBox.Location = new System.Drawing.Point(37, 149);
+            this.audioFromSysCheckBox.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.audioFromSysCheckBox.Name = "audioFromSysCheckBox";
-            this.audioFromSysCheckBox.Size = new System.Drawing.Size(163, 24);
+            this.audioFromSysCheckBox.Size = new System.Drawing.Size(353, 44);
             this.audioFromSysCheckBox.TabIndex = 3;
             this.audioFromSysCheckBox.Text = "System Soundcard";
             this.audioFromSysCheckBox.UseVisualStyleBackColor = true;
@@ -137,10 +138,10 @@ namespace AdamS2T2Docs
             // 
             this.audioFromMicCheckBox.AutoSize = true;
             this.audioFromMicCheckBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.audioFromMicCheckBox.Location = new System.Drawing.Point(16, 30);
-            this.audioFromMicCheckBox.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.audioFromMicCheckBox.Location = new System.Drawing.Point(37, 67);
+            this.audioFromMicCheckBox.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.audioFromMicCheckBox.Name = "audioFromMicCheckBox";
-            this.audioFromMicCheckBox.Size = new System.Drawing.Size(111, 24);
+            this.audioFromMicCheckBox.Size = new System.Drawing.Size(237, 44);
             this.audioFromMicCheckBox.TabIndex = 2;
             this.audioFromMicCheckBox.Text = "Microphone";
             this.audioFromMicCheckBox.UseVisualStyleBackColor = true;
@@ -150,10 +151,10 @@ namespace AdamS2T2Docs
             // audioSourceButton
             // 
             this.audioSourceButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.audioSourceButton.Location = new System.Drawing.Point(160, 449);
-            this.audioSourceButton.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.audioSourceButton.Location = new System.Drawing.Point(373, 1002);
+            this.audioSourceButton.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.audioSourceButton.Name = "audioSourceButton";
-            this.audioSourceButton.Size = new System.Drawing.Size(103, 31);
+            this.audioSourceButton.Size = new System.Drawing.Size(240, 69);
             this.audioSourceButton.TabIndex = 7;
             this.audioSourceButton.Text = "Audio Source";
             this.audioSourceButton.UseVisualStyleBackColor = true;
@@ -162,20 +163,20 @@ namespace AdamS2T2Docs
             // label1
             // 
             this.label1.AutoSize = true;
-            this.label1.Location = new System.Drawing.Point(172, 16);
-            this.label1.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label1.Location = new System.Drawing.Point(401, 36);
+            this.label1.Margin = new System.Windows.Forms.Padding(5, 0, 5, 0);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(35, 13);
+            this.label1.Size = new System.Drawing.Size(79, 29);
             this.label1.TabIndex = 8;
             this.label1.Text = "label1";
             // 
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.Location = new System.Drawing.Point(460, 16);
-            this.label2.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.label2.Location = new System.Drawing.Point(1073, 36);
+            this.label2.Margin = new System.Windows.Forms.Padding(5, 0, 5, 0);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(35, 13);
+            this.label2.Size = new System.Drawing.Size(79, 29);
             this.label2.TabIndex = 9;
             this.label2.Text = "label2";
             this.label2.Click += new System.EventHandler(this.label2_Click);
@@ -189,10 +190,10 @@ namespace AdamS2T2Docs
             // 
             this.labelTime.AutoSize = true;
             this.labelTime.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.labelTime.Location = new System.Drawing.Point(52, 427);
-            this.labelTime.Margin = new System.Windows.Forms.Padding(2, 0, 2, 0);
+            this.labelTime.Location = new System.Drawing.Point(121, 953);
+            this.labelTime.Margin = new System.Windows.Forms.Padding(5, 0, 5, 0);
             this.labelTime.Name = "labelTime";
-            this.labelTime.Size = new System.Drawing.Size(71, 20);
+            this.labelTime.Size = new System.Drawing.Size(157, 40);
             this.labelTime.TabIndex = 10;
             this.labelTime.Text = "00:00:00";
             this.labelTime.Click += new System.EventHandler(this.labelTime_Click);
@@ -200,10 +201,10 @@ namespace AdamS2T2Docs
             // realDocsButton
             // 
             this.realDocsButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
-            this.realDocsButton.Location = new System.Drawing.Point(7, 7);
-            this.realDocsButton.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.realDocsButton.Location = new System.Drawing.Point(16, 16);
+            this.realDocsButton.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.realDocsButton.Name = "realDocsButton";
-            this.realDocsButton.Size = new System.Drawing.Size(114, 23);
+            this.realDocsButton.Size = new System.Drawing.Size(266, 51);
             this.realDocsButton.TabIndex = 11;
             this.realDocsButton.Text = "To Real Docs";
             this.realDocsButton.UseVisualStyleBackColor = true;
@@ -213,10 +214,10 @@ namespace AdamS2T2Docs
             // 
             this.radioButtonJustFinal.AutoSize = true;
             this.radioButtonJustFinal.Checked = true;
-            this.radioButtonJustFinal.Location = new System.Drawing.Point(3, 15);
-            this.radioButtonJustFinal.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.radioButtonJustFinal.Location = new System.Drawing.Point(7, 33);
+            this.radioButtonJustFinal.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.radioButtonJustFinal.Name = "radioButtonJustFinal";
-            this.radioButtonJustFinal.Size = new System.Drawing.Size(102, 17);
+            this.radioButtonJustFinal.Size = new System.Drawing.Size(220, 33);
             this.radioButtonJustFinal.TabIndex = 14;
             this.radioButtonJustFinal.TabStop = true;
             this.radioButtonJustFinal.Text = "Just Final Result";
@@ -226,10 +227,10 @@ namespace AdamS2T2Docs
             // radioButtonWordByWord
             // 
             this.radioButtonWordByWord.AutoSize = true;
-            this.radioButtonWordByWord.Location = new System.Drawing.Point(110, 15);
-            this.radioButtonWordByWord.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.radioButtonWordByWord.Location = new System.Drawing.Point(257, 33);
+            this.radioButtonWordByWord.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.radioButtonWordByWord.Name = "radioButtonWordByWord";
-            this.radioButtonWordByWord.Size = new System.Drawing.Size(95, 17);
+            this.radioButtonWordByWord.Size = new System.Drawing.Size(199, 33);
             this.radioButtonWordByWord.TabIndex = 15;
             this.radioButtonWordByWord.Text = "Word By Word";
             this.radioButtonWordByWord.UseVisualStyleBackColor = true;
@@ -239,11 +240,11 @@ namespace AdamS2T2Docs
             // 
             this.groupBox1.Controls.Add(this.radioButtonJustFinal);
             this.groupBox1.Controls.Add(this.radioButtonWordByWord);
-            this.groupBox1.Location = new System.Drawing.Point(475, 31);
-            this.groupBox1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.groupBox1.Location = new System.Drawing.Point(1108, 69);
+            this.groupBox1.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.groupBox1.Name = "groupBox1";
-            this.groupBox1.Padding = new System.Windows.Forms.Padding(2, 2, 2, 2);
-            this.groupBox1.Size = new System.Drawing.Size(243, 35);
+            this.groupBox1.Padding = new System.Windows.Forms.Padding(5, 4, 5, 4);
+            this.groupBox1.Size = new System.Drawing.Size(567, 78);
             this.groupBox1.TabIndex = 16;
             this.groupBox1.TabStop = false;
             this.groupBox1.Text = "OUTPUT to Google";
@@ -252,11 +253,11 @@ namespace AdamS2T2Docs
             // 
             this.languageGroupBox.Controls.Add(this.cnenRadioButton);
             this.languageGroupBox.Controls.Add(this.enRadioButton);
-            this.languageGroupBox.Location = new System.Drawing.Point(160, 31);
-            this.languageGroupBox.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.languageGroupBox.Location = new System.Drawing.Point(373, 69);
+            this.languageGroupBox.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.languageGroupBox.Name = "languageGroupBox";
-            this.languageGroupBox.Padding = new System.Windows.Forms.Padding(2, 2, 2, 2);
-            this.languageGroupBox.Size = new System.Drawing.Size(243, 35);
+            this.languageGroupBox.Padding = new System.Windows.Forms.Padding(5, 4, 5, 4);
+            this.languageGroupBox.Size = new System.Drawing.Size(567, 78);
             this.languageGroupBox.TabIndex = 17;
             this.languageGroupBox.TabStop = false;
             this.languageGroupBox.Text = "Language";
@@ -265,10 +266,10 @@ namespace AdamS2T2Docs
             // cnenRadioButton
             // 
             this.cnenRadioButton.AutoSize = true;
-            this.cnenRadioButton.Location = new System.Drawing.Point(3, 15);
-            this.cnenRadioButton.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.cnenRadioButton.Location = new System.Drawing.Point(7, 33);
+            this.cnenRadioButton.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.cnenRadioButton.Name = "cnenRadioButton";
-            this.cnenRadioButton.Size = new System.Drawing.Size(55, 17);
+            this.cnenRadioButton.Size = new System.Drawing.Size(113, 33);
             this.cnenRadioButton.TabIndex = 14;
             this.cnenRadioButton.Text = "CN&EN";
             this.cnenRadioButton.UseVisualStyleBackColor = true;
@@ -278,10 +279,10 @@ namespace AdamS2T2Docs
             // 
             this.enRadioButton.AutoSize = true;
             this.enRadioButton.Checked = true;
-            this.enRadioButton.Location = new System.Drawing.Point(110, 15);
-            this.enRadioButton.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.enRadioButton.Location = new System.Drawing.Point(257, 33);
+            this.enRadioButton.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.enRadioButton.Name = "enRadioButton";
-            this.enRadioButton.Size = new System.Drawing.Size(40, 17);
+            this.enRadioButton.Size = new System.Drawing.Size(78, 33);
             this.enRadioButton.TabIndex = 15;
             this.enRadioButton.TabStop = true;
             this.enRadioButton.Text = "EN";
@@ -290,10 +291,10 @@ namespace AdamS2T2Docs
             // 
             // buttonWordCopy
             // 
-            this.buttonWordCopy.Location = new System.Drawing.Point(7, 42);
-            this.buttonWordCopy.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.buttonWordCopy.Location = new System.Drawing.Point(16, 94);
+            this.buttonWordCopy.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.buttonWordCopy.Name = "buttonWordCopy";
-            this.buttonWordCopy.Size = new System.Drawing.Size(83, 24);
+            this.buttonWordCopy.Size = new System.Drawing.Size(194, 54);
             this.buttonWordCopy.TabIndex = 18;
             this.buttonWordCopy.Text = "WordCopy";
             this.buttonWordCopy.UseVisualStyleBackColor = true;
@@ -302,10 +303,10 @@ namespace AdamS2T2Docs
             // buttonStopWordCopy
             // 
             this.buttonStopWordCopy.Enabled = false;
-            this.buttonStopWordCopy.Location = new System.Drawing.Point(7, 79);
-            this.buttonStopWordCopy.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.buttonStopWordCopy.Location = new System.Drawing.Point(16, 176);
+            this.buttonStopWordCopy.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.buttonStopWordCopy.Name = "buttonStopWordCopy";
-            this.buttonStopWordCopy.Size = new System.Drawing.Size(83, 24);
+            this.buttonStopWordCopy.Size = new System.Drawing.Size(194, 54);
             this.buttonStopWordCopy.TabIndex = 19;
             this.buttonStopWordCopy.Text = "StopCopy";
             this.buttonStopWordCopy.UseVisualStyleBackColor = true;
@@ -317,20 +318,20 @@ namespace AdamS2T2Docs
             this.richTextBoxWordCopy.Font = new System.Drawing.Font("Arial", 14.1F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.richTextBoxWordCopy.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(64)))), ((int)(((byte)(64)))), ((int)(((byte)(64)))));
             this.richTextBoxWordCopy.HideSelection = false;
-            this.richTextBoxWordCopy.Location = new System.Drawing.Point(4, 4);
-            this.richTextBoxWordCopy.Margin = new System.Windows.Forms.Padding(2, 33, 2, 16);
+            this.richTextBoxWordCopy.Location = new System.Drawing.Point(9, 9);
+            this.richTextBoxWordCopy.Margin = new System.Windows.Forms.Padding(5, 74, 5, 36);
             this.richTextBoxWordCopy.Name = "richTextBoxWordCopy";
             this.richTextBoxWordCopy.ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Vertical;
-            this.richTextBoxWordCopy.Size = new System.Drawing.Size(767, 287);
+            this.richTextBoxWordCopy.Size = new System.Drawing.Size(1790, 640);
             this.richTextBoxWordCopy.TabIndex = 20;
             this.richTextBoxWordCopy.Text = "";
             // 
             // buttonToStreamText
             // 
-            this.buttonToStreamText.Location = new System.Drawing.Point(153, 79);
-            this.buttonToStreamText.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.buttonToStreamText.Location = new System.Drawing.Point(357, 176);
+            this.buttonToStreamText.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.buttonToStreamText.Name = "buttonToStreamText";
-            this.buttonToStreamText.Size = new System.Drawing.Size(97, 24);
+            this.buttonToStreamText.Size = new System.Drawing.Size(226, 54);
             this.buttonToStreamText.TabIndex = 21;
             this.buttonToStreamText.Text = "ToStreamText";
             this.buttonToStreamText.UseVisualStyleBackColor = true;
@@ -339,10 +340,10 @@ namespace AdamS2T2Docs
             // buttonStopStreamText
             // 
             this.buttonStopStreamText.Enabled = false;
-            this.buttonStopStreamText.Location = new System.Drawing.Point(259, 79);
-            this.buttonStopStreamText.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.buttonStopStreamText.Location = new System.Drawing.Point(604, 176);
+            this.buttonStopStreamText.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.buttonStopStreamText.Name = "buttonStopStreamText";
-            this.buttonStopStreamText.Size = new System.Drawing.Size(94, 24);
+            this.buttonStopStreamText.Size = new System.Drawing.Size(219, 54);
             this.buttonStopStreamText.TabIndex = 22;
             this.buttonStopStreamText.Text = "StopStreamtext";
             this.buttonStopStreamText.UseVisualStyleBackColor = true;
@@ -352,21 +353,21 @@ namespace AdamS2T2Docs
             // 
             this.tabControl1.Controls.Add(this.tabPage1);
             this.tabControl1.Controls.Add(this.tabPage2);
-            this.tabControl1.Location = new System.Drawing.Point(7, 106);
-            this.tabControl1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.tabControl1.Location = new System.Drawing.Point(16, 236);
+            this.tabControl1.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.tabControl1.Name = "tabControl1";
             this.tabControl1.SelectedIndex = 0;
-            this.tabControl1.Size = new System.Drawing.Size(783, 317);
+            this.tabControl1.Size = new System.Drawing.Size(1827, 707);
             this.tabControl1.TabIndex = 23;
             // 
             // tabPage1
             // 
             this.tabPage1.Controls.Add(this.richTextBox1);
-            this.tabPage1.Location = new System.Drawing.Point(4, 22);
-            this.tabPage1.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.tabPage1.Location = new System.Drawing.Point(10, 47);
+            this.tabPage1.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.tabPage1.Name = "tabPage1";
-            this.tabPage1.Padding = new System.Windows.Forms.Padding(2, 2, 2, 2);
-            this.tabPage1.Size = new System.Drawing.Size(775, 291);
+            this.tabPage1.Padding = new System.Windows.Forms.Padding(5, 4, 5, 4);
+            this.tabPage1.Size = new System.Drawing.Size(1807, 650);
             this.tabPage1.TabIndex = 0;
             this.tabPage1.Text = "Speech2Text";
             this.tabPage1.UseVisualStyleBackColor = true;
@@ -374,11 +375,11 @@ namespace AdamS2T2Docs
             // tabPage2
             // 
             this.tabPage2.Controls.Add(this.richTextBoxWordCopy);
-            this.tabPage2.Location = new System.Drawing.Point(4, 22);
-            this.tabPage2.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.tabPage2.Location = new System.Drawing.Point(10, 47);
+            this.tabPage2.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.tabPage2.Name = "tabPage2";
-            this.tabPage2.Padding = new System.Windows.Forms.Padding(2, 2, 2, 2);
-            this.tabPage2.Size = new System.Drawing.Size(775, 291);
+            this.tabPage2.Padding = new System.Windows.Forms.Padding(5, 4, 5, 4);
+            this.tabPage2.Size = new System.Drawing.Size(1807, 650);
             this.tabPage2.TabIndex = 1;
             this.tabPage2.Text = "wordCOPY";
             this.tabPage2.UseVisualStyleBackColor = true;
@@ -386,20 +387,31 @@ namespace AdamS2T2Docs
             // buttonCaption
             // 
             this.buttonCaption.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.857143F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.buttonCaption.Location = new System.Drawing.Point(327, 455);
-            this.buttonCaption.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.buttonCaption.Location = new System.Drawing.Point(763, 1015);
+            this.buttonCaption.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.buttonCaption.Name = "buttonCaption";
-            this.buttonCaption.Size = new System.Drawing.Size(76, 25);
+            this.buttonCaption.Size = new System.Drawing.Size(177, 56);
             this.buttonCaption.TabIndex = 24;
             this.buttonCaption.Text = "Caption";
             this.buttonCaption.UseVisualStyleBackColor = true;
             this.buttonCaption.Click += new System.EventHandler(this.buttonCaption_Click);
             // 
+            // labelStatus
+            // 
+            this.labelStatus.AutoSize = true;
+            this.labelStatus.ForeColor = System.Drawing.SystemColors.HotTrack;
+            this.labelStatus.Location = new System.Drawing.Point(1110, 184);
+            this.labelStatus.Name = "labelStatus";
+            this.labelStatus.Size = new System.Drawing.Size(53, 29);
+            this.labelStatus.TabIndex = 25;
+            this.labelStatus.Text = "Idle";
+            // 
             // Form1
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(14F, 29F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(793, 497);
+            this.ClientSize = new System.Drawing.Size(1850, 1109);
+            this.Controls.Add(this.labelStatus);
             this.Controls.Add(this.buttonCaption);
             this.Controls.Add(this.audioSourceGroupBox);
             this.Controls.Add(this.tabControl1);
@@ -416,7 +428,7 @@ namespace AdamS2T2Docs
             this.Controls.Add(this.audioSourceButton);
             this.Controls.Add(this.stopRecordButton);
             this.Controls.Add(this.startRecordButton);
-            this.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.Margin = new System.Windows.Forms.Padding(5, 4, 5, 4);
             this.Name = "Form1";
             this.Text = "S2T2Googledocs Word By Word";
             this.FormClosed += new System.Windows.Forms.FormClosedEventHandler(this.Form1_FormClosed);
@@ -465,6 +477,7 @@ namespace AdamS2T2Docs
         private System.Windows.Forms.TabPage tabPage1;
         private System.Windows.Forms.TabPage tabPage2;
         private System.Windows.Forms.Button buttonCaption;
+        private System.Windows.Forms.Label labelStatus;
     }
 }
 

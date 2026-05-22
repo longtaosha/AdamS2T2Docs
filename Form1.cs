@@ -1,29 +1,27 @@
-﻿using System;
-using System.IO;
-using System.Windows.Forms;
+﻿using CSCore;
+using CSCore.Codecs.WAV;
+using CSCore.SoundIn;
+using CSCore.SoundOut;
+using CSCore.Streams;
+using MySql.Data.MySqlClient;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using WebSocket4Net;
-
-
-using CSCore;
-using CSCore.SoundIn;
-using CSCore.Streams;
-using CSCore.Codecs.WAV;
-using System.Drawing;
-using System.Windows.Documents;
-using System.Text;
-using CSCore.SoundOut;
-using System.Threading;
-using System.Data.SqlClient;
-using MySql.Data.MySqlClient;
-using System.Timers;
-using System.Threading.Tasks;
-using System.Net;
-using System.Security.Authentication;
-
 using Serilog;
 using Serilog.Sinks.File;
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using System.Drawing;
+using System.IO;
+using System.Net;
+using System.Security.Authentication;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Timers;
+using System.Windows.Documents;
+using System.Windows.Forms;
+using WebSocket4Net;
 
 namespace AdamS2T2Docs
 {
@@ -51,6 +49,13 @@ namespace AdamS2T2Docs
         private const int ShortFragmentWordThreshold = 5;
         private string _googleDocsProofreadBuffer = "";
         private const int GoogleDocsProofreadMinWords = 12;
+
+        private string _currentBusyStage = "Idle";
+        private DateTime _currentBusyStageStart = DateTime.MinValue;
+        private readonly object _busyStageLock = new object();
+        private readonly Queue<string> _pendingGoogleDocsQueue = new Queue<string>();
+        private readonly object _pendingGoogleDocsQueueLock = new object();
+        private bool _isGoogleDocsWorkerRunning = false;
 
         private string googleDocsIDForFakeTyping;
         private static string uri;
@@ -125,6 +130,31 @@ namespace AdamS2T2Docs
                 soundIn.DataAvailable += SoundIn_DataAvailable;
                 soundIn.Stopped += OnSoundInStopped;
                 connectToGoogle.OnTextCopied += outputWordToUI;
+
+                System.Windows.Forms.Timer monitorTimer = new System.Windows.Forms.Timer();
+                monitorTimer.Interval = 1000;
+                monitorTimer.Tick += (s, e) =>
+                {
+                    string stage;
+                    DateTime start;
+
+                    lock (_busyStageLock)
+                    {
+                        stage = _currentBusyStage;
+                        start = _currentBusyStageStart;
+                    }
+
+                    if (stage == "Idle")
+                    {
+                        labelStatus.Text = "Idle"; 
+                    }
+                    else
+                    {
+                        var seconds = (DateTime.Now - start).TotalSeconds;
+                        labelStatus.Text = "Busy: " + stage + " " + seconds.ToString("0.0") + "s";
+                    }
+                };
+                monitorTimer.Start();
 
             }
             catch (Exception ex)
@@ -468,9 +498,16 @@ namespace AdamS2T2Docs
                                     await _aiSemaphore.WaitAsync();
                                     try
                                     {
-                                        docsProof = await qwenProofreader.ProofreadAsync(
-                                            docsText,
-                                            _proofreadContext);
+                                        try
+                                        {
+                                            docsProof = await qwenProofreader.ProofreadAsync(
+                                                docsText,
+                                                _proofreadContext);
+                                        }
+                                        finally
+                                        {
+                                            ClearBusyStage("Qwen Proofread");
+                                        }
                                     }
                                     finally
                                     {
@@ -489,7 +526,15 @@ namespace AdamS2T2Docs
                                 {
                                     try
                                     {
-                                        await connectToGoogle.connectFinalResultAsync(0, docsText);
+                                        SetBusyStage("Google Docs Append");
+                                        try
+                                        {
+                                            await connectToGoogle.connectFinalResultAsync(0, docsText);
+                                        }
+                                        finally
+                                        {
+                                            ClearBusyStage("Google Docs Append");
+                                        }
                                     }
                                     catch (TaskCanceledException ex)
                                     {
@@ -622,6 +667,32 @@ namespace AdamS2T2Docs
             return words.Length;
         }
 
+        private void SetBusyStage(string stage)
+        {
+            lock (_busyStageLock)
+            {
+                _currentBusyStage = stage;
+                _currentBusyStageStart = DateTime.Now;
+            }
+
+            File.AppendAllText("logs/runtime-stage.txt",
+                DateTime.Now + " ENTER " + stage + "\n");
+        }
+
+        private void ClearBusyStage(string stage)
+        {
+            TimeSpan elapsed;
+
+            lock (_busyStageLock)
+            {
+                elapsed = DateTime.Now - _currentBusyStageStart;
+                _currentBusyStage = "Idle";
+                _currentBusyStageStart = DateTime.MinValue;
+            }
+
+            File.AppendAllText("logs/runtime-stage.txt",
+                DateTime.Now + " EXIT " + stage + " elapsed=" + elapsed.TotalMilliseconds.ToString("0") + "ms\n");
+        }
 
         private void loadApiKey()
         {
