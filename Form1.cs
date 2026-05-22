@@ -193,9 +193,23 @@ namespace AdamS2T2Docs
 
                     if (webSocket.State == WebSocketState.Open)
                     {
-                        webSocket.Send(buffer, 0, read);
+                        //webSocket.Send(buffer, 0, read);
                         //byte[] b = new byte[1280];
                         //webSocket.Send(b,0,1280);
+                        try
+                        {
+                            webSocket.Send(buffer, 0, read);
+                        }
+                        catch (Exception ex)
+                        {
+                            File.AppendAllText("logs/websocket-send-errors.txt",
+                                DateTime.Now + "\n" +
+                                ex.Message + "\n" +
+                                ex.StackTrace + "\n\n");
+
+                            label1.Invoke(new Action(() => { label1.Text = "websocket send error"; }));
+                            return;
+                        }
                     }
                     else
                     {
@@ -473,7 +487,27 @@ namespace AdamS2T2Docs
 
                                 if (!isGoogleError)
                                 {
-                                    await connectToGoogle.connectFinalResultAsync(0, docsText);
+                                    try
+                                    {
+                                        await connectToGoogle.connectFinalResultAsync(0, docsText);
+                                    }
+                                    catch (TaskCanceledException ex)
+                                    {
+                                        _googleDocsProofreadBuffer = docsText + _googleDocsProofreadBuffer;
+
+                                        File.AppendAllText("logs/googleErrors.txt",
+                                            DateTime.Now + "\nGoogle Docs timeout/canceled, requeued docsText:\n" +
+                                            docsText + "\n" +
+                                            ex.Message + "\n" + ex.StackTrace + "\n\n");
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        //isGoogleError = true;
+
+                                        File.AppendAllText("logs/googleErrors.txt",
+                                            DateTime.Now + "\nGoogle Docs error:\n" +
+                                            ex.Message + "\n" + ex.StackTrace + "\n\n");
+                                    }
                                 }
                             }
 

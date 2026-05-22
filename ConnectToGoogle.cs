@@ -1270,11 +1270,12 @@ namespace AdamS2T2Docs
 
         public async Task connectFinalResultAsync(int type, string line)
         {
-            Document document = await getDocumentAsync(_documentId);
+            
             List<Request> requests = new List<Request> { };
 
             if (isNamed == true)
             {
+                Document document = await getDocumentAsync(_documentId);
                 if (document.NamedRanges != null)
                 {
                     if (document.NamedRanges[nameOfRange] != null)
@@ -1330,6 +1331,7 @@ namespace AdamS2T2Docs
                     {
                         // Handle the exception
                         File.AppendAllText("logs/googleAppendLogs.txt", DateTime.Now.ToString() + " Exception caught " + ex.ToString()+"\n");
+                        throw;
                     }
 
                     
