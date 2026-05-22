@@ -50,7 +50,7 @@ namespace AdamS2T2Docs
         private string _pendingShortFinalText = "";
         private const int ShortFragmentWordThreshold = 5;
         private string _googleDocsProofreadBuffer = "";
-        private const int GoogleDocsProofreadMinWords = 18;
+        private const int GoogleDocsProofreadMinWords = 12;
 
         private string googleDocsIDForFakeTyping;
         private static string uri;
@@ -380,11 +380,8 @@ namespace AdamS2T2Docs
                                 }
                             }
 
-                            
-                            File.AppendAllText("logs/qwen-proofread.txt",
-                            "AI : " + finalText + "\n" +
-                            "CONF: " + (proof != null ? proof.Confidence.ToString() : "N/A") + "\n" +
-                            "NEED_MORE: " + (proof != null ? proof.NeedMoreContext.ToString() : "N/A") + "\n\n");
+
+                            File.AppendAllText("logs/qwen-proofread.txt", "AI : " + finalText + "\n\n");
 
                             richTextBox1?.Invoke(new Action(() =>
                             {
@@ -446,7 +443,8 @@ namespace AdamS2T2Docs
 
                             if (docsBufferWordCount >= GoogleDocsProofreadMinWords)
                             {
-                                string docsText = _googleDocsProofreadBuffer;
+                                string docsRawText = _googleDocsProofreadBuffer;
+                                string docsText = docsRawText;
                                 _googleDocsProofreadBuffer = "";
 
                                 ProofreadResult docsProof = null;
@@ -469,10 +467,9 @@ namespace AdamS2T2Docs
                                 }
 
                                 File.AppendAllText("logs/qwen-proofread-docs-buffer.txt",
-                                    DateTime.Now + "\n" +
-                                    "DOCS_RAW: " + docsText + "\n" +
-                                    "DOCS_CONF: " + (docsProof != null ? docsProof.Confidence.ToString() : "N/A") + "\n" +
-                                    "DOCS_NEED_MORE: " + (docsProof != null ? docsProof.NeedMoreContext.ToString() : "N/A") + "\n\n");
+                                DateTime.Now + "\n" +
+                                "DOCS_RAW: " + docsRawText + "\n" +
+                                "DOCS_AI : " + docsText + "\n\n");
 
                                 if (!isGoogleError)
                                 {
