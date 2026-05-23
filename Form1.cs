@@ -405,7 +405,7 @@ namespace AdamS2T2Docs
                                     !EndsWithBoundaryPunctuation(_proofreadContext) &&
                                     !StartsWithBoundaryPunctuation(finalText))
                                 {
-                                    finalText = "," + finalText;
+                                    finalText = ", " + finalText.TrimStart();
 
                                     File.AppendAllText(
                                         "logs/pauseComma.txt",
@@ -483,29 +483,11 @@ namespace AdamS2T2Docs
                             // end of pending short
                             */
 
-                            File.AppendAllText("logs/qwen-proofread.txt", DateTime.Now + "\nRAW: " + finalText + "\n");
+                            File.AppendAllText("logs/qwen-proofread.txt", DateTime.Now + "\nRAW_UI: " + finalText + "\n\n");
 
-                            ProofreadResult proof = null;
-
-                            if (isAiProofreadEnabled && qwenProofreader != null)
-                            {
-                                await _aiSemaphore.WaitAsync();
-                                try
-                                {
-                                    proof = await qwenProofreader.ProofreadAsync(
-                                        finalText,
-                                        _proofreadContext);
-
-                                    finalText = proof.CorrectedText;
-                                }
-                                finally
-                                {
-                                    _aiSemaphore.Release();
-                                }
-                            }
-
-
-                            File.AppendAllText("logs/qwen-proofread.txt", "AI : " + finalText + "\n\n");
+                            // UI path: show raw final text directly.
+                            // Qwen proofreading is only used later in ProcessGoogleDocsQueueAsync()
+                            // for Google Docs output.
 
                             richTextBox1?.Invoke(new Action(() =>
                             {

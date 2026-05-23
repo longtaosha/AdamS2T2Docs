@@ -131,10 +131,11 @@ namespace AdamS2T2Docs
             {
                 model = _model,
                 messages = new object[]
-                {
-                    new { role = "user", content = prompt }
-                },
-                temperature = 0
+            {
+                new { role = "user", content = prompt }
+            },
+                temperature = 0,
+                enable_thinking = false
             };
 
             string json = JsonConvert.SerializeObject(body);
