@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
@@ -20,6 +21,12 @@ namespace AdamS2T2Docs
         private readonly string _baseUrl;
         private readonly string _model;
         private readonly HttpClient _httpClient;
+
+        private readonly string _promptFile =
+            @"prompts/qwen-proofread-prompt.txt";
+
+        private readonly string _contextFile =
+            @"prompts/qwen-proofread-context.txt";
 
         public QwenProofreader(string apiKey, string baseUrl, string model)
         {
@@ -87,35 +94,38 @@ namespace AdamS2T2Docs
     ? "No prior context."
     : context;
 
+            string promptTemplate = "";
+            string customContext = "";
+
+            try
+            {
+                if (File.Exists(_promptFile))
+                    promptTemplate = File.ReadAllText(_promptFile);
+
+                if (File.Exists(_contextFile))
+                    customContext = File.ReadAllText(_contextFile);
+            }
+            catch (Exception ex)
+            {
+                File.AppendAllText(
+                    "logs/qwenPromptLoadErrors.txt",
+                    DateTime.Now +
+                    "\nPrompt/context load error:\n" +
+                    ex.ToString() +
+                    "\n\n");
+            }
+
             string prompt =
-@"You are an experienced human conference transcript proofreader.
-Your job is to review ASR transcript text conservatively, 
-like a professional human proofreader, correcting only clear recognition errors 
-while preserving the speaker's original wording and speaking style.
-
-Task:
-Correct only likely ASR recognition errors in the current text.
-
-Context:
-The prior transcript is for reference only. Do not output it.
-
-Rules:
-1. Preserve meaning, wording, and word order as much as possible.
-2. Do not rewrite for style or fluency.
-3. Do not fix grammar-only issues unless caused by ASR.
-4. If uncertain, keep the original text.
-5. You may insert line breaks only at strong semantic or sentence boundaries when it improves readability.
-6. Do not insert excessive or decorative line breaks.
-7. Return only the corrected text, with no explanation.
-
-Prior transcript context:
-"
-+ contextBlock
-+ @"
-
-Current ASR text:
-"
-+ coreText;
+                promptTemplate +
+                "\n\nCustom domain context:\n" +
+                customContext +
+                "\n\nPrior transcript context:\n" +
+                contextBlock +
+                "\n\nASR fragment:\n" +
+                coreText;
+            File.WriteAllText(
+    "logs/last-qwen-prompt.txt",
+    prompt);
 
             var body = new
             {

@@ -56,6 +56,8 @@ namespace AdamS2T2Docs
         private readonly LinkedList<string> _pendingGoogleDocsQueue = new LinkedList<string>();
         private readonly object _pendingGoogleDocsQueueLock = new object();
         private bool _isGoogleDocsWorkerRunning = false;
+        private DateTime _lastFinalSegmentTime = DateTime.MinValue;
+        private const int GoogleDocsIdleFlushSeconds = 2;
 
         private string googleDocsIDForFakeTyping;
         private static string uri;
@@ -150,6 +152,7 @@ namespace AdamS2T2Docs
                         queueCount = _pendingGoogleDocsQueue.Count;
                     }
 
+                    // status display
                     if (stage == "Idle")
                     {
                         labelStatus.Text = "Idle | Q=" + queueCount;
@@ -169,7 +172,38 @@ namespace AdamS2T2Docs
                     {
                         _ = ProcessGoogleDocsQueueAsync();
                     }
+
+                    // idle flush:
+                    // if no new final seg for several seconds,
+                    // flush remaining docs buffer into queue
+                    if (!string.IsNullOrWhiteSpace(_googleDocsProofreadBuffer) &&
+                        _lastFinalSegmentTime != DateTime.MinValue &&
+                        (DateTime.Now - _lastFinalSegmentTime).TotalSeconds >= GoogleDocsIdleFlushSeconds)
+                    {
+                        string docsRawText = _googleDocsProofreadBuffer;
+                        _googleDocsProofreadBuffer = "";
+
+                        lock (_pendingGoogleDocsQueueLock)
+                        {
+                            _pendingGoogleDocsQueue.AddLast(docsRawText);
+
+                            File.AppendAllText(
+                                "logs/googleQueue.txt",
+                                DateTime.Now +
+                                " IDLE_FLUSH_ENQUEUE len=" +
+                                docsRawText.Length +
+                                " queue=" +
+                                _pendingGoogleDocsQueue.Count +
+                                "\n");
+                        }
+
+                        _ = ProcessGoogleDocsQueueAsync();
+
+                        // prevent repeated idle flush
+                        _lastFinalSegmentTime = DateTime.MinValue;
+                    }
                 };
+
                 monitorTimer.Start();
 
             }
@@ -354,6 +388,7 @@ namespace AdamS2T2Docs
                             currentSpeaker = result[4]; */
 
                             string finalText = result[1];
+                            _lastFinalSegmentTime = DateTime.Now;
                             int wordCount = CountWordsForProofread(finalText);
                             // 短 fragment：先暂存，等待下一段
                             /* *****
