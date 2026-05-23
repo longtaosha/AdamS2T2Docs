@@ -58,6 +58,8 @@ namespace AdamS2T2Docs
         private bool _isGoogleDocsWorkerRunning = false;
         private DateTime _lastFinalSegmentTime = DateTime.MinValue;
         private const int GoogleDocsIdleFlushSeconds = 2;
+        private DateTime _lastFinalArrivalTime = DateTime.MinValue;
+        private bool _pendingCommaAfterPause = false;
 
         private string googleDocsIDForFakeTyping;
         private static string uri;
@@ -388,6 +390,33 @@ namespace AdamS2T2Docs
                             currentSpeaker = result[4]; */
 
                             string finalText = result[1];
+
+                            // pause-comma logic:
+                            // if long pause and neither side has punctuation,
+                            // prepend comma to current segment
+                            if (_lastFinalArrivalTime != DateTime.MinValue)
+                            {
+                                double pauseMs =
+                                    (DateTime.Now - _lastFinalArrivalTime)
+                                    .TotalMilliseconds;
+
+                                if (pauseMs > 2500 &&
+                                    !_pendingCommaAfterPause &&
+                                    !EndsWithBoundaryPunctuation(_proofreadContext) &&
+                                    !StartsWithBoundaryPunctuation(finalText))
+                                {
+                                    finalText = "," + finalText;
+
+                                    File.AppendAllText(
+                                        "logs/pauseComma.txt",
+                                        DateTime.Now +
+                                        " pause=" +
+                                        pauseMs.ToString("0") +
+                                        "ms ADD_COMMA\n");
+                                }
+                            }
+
+                            _lastFinalArrivalTime = DateTime.Now;
                             _lastFinalSegmentTime = DateTime.Now;
                             int wordCount = CountWordsForProofread(finalText);
                             // 短 fragment：先暂存，等待下一段
@@ -714,7 +743,46 @@ namespace AdamS2T2Docs
             }
         }
 
+        private bool EndsWithBoundaryPunctuation(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return true;
 
+            char c = text[text.Length - 1];
+
+            return c == '.' ||
+                   c == '?' ||
+                   c == '!' ||
+                   c == ',' ||
+                   c == ':' ||
+                   c == ';' ||
+                   c == '—' ||
+                   c == '\n' ||
+                   c == '\r';
+        }
+
+        private bool StartsWithBoundaryPunctuation(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return true;
+
+            string trimmed = text.TrimStart();
+
+            if (string.IsNullOrEmpty(trimmed))
+                return true;
+
+            char c = trimmed[0];
+
+            return c == '.' ||
+                   c == '?' ||
+                   c == '!' ||
+                   c == ',' ||
+                   c == ':' ||
+                   c == ';' ||
+                   c == '—' ||
+                   c == '\n' ||
+                   c == '\r';
+        }
 
         private int CountWordsForProofread(string text)
         {
