@@ -919,6 +919,58 @@ namespace AdamS2T2Docs
                 _isGoogleDocsWorkerRunning = false;
             }
         }
+
+        private async Task FlushPendingDocsBufferAsync()
+        {
+            // flush pending docs buffer
+            if (!string.IsNullOrWhiteSpace(_googleDocsProofreadBuffer))
+            {
+                string docsRawText = _googleDocsProofreadBuffer;
+                _googleDocsProofreadBuffer = "";
+
+                lock (_pendingGoogleDocsQueueLock)
+                {
+                    _pendingGoogleDocsQueue.AddLast(docsRawText);
+
+                    File.AppendAllText(
+                        "logs/googleQueue.txt",
+                        DateTime.Now +
+                        " STOP_FLUSH_ENQUEUE len=" +
+                        docsRawText.Length +
+                        " queue=" +
+                        _pendingGoogleDocsQueue.Count +
+                        "\n");
+                }
+            }
+
+            // make sure worker starts
+            await ProcessGoogleDocsQueueAsync();
+
+            // wait queue drain
+            while (true)
+            {
+                bool queueEmpty;
+                bool workerRunning;
+
+                lock (_pendingGoogleDocsQueueLock)
+                {
+                    queueEmpty =
+                        _pendingGoogleDocsQueue.Count == 0;
+                }
+
+                workerRunning = _isGoogleDocsWorkerRunning;
+
+                if (queueEmpty && !workerRunning)
+                    break;
+
+                await Task.Delay(200);
+            }
+
+            File.AppendAllText(
+                "logs/googleQueue.txt",
+                DateTime.Now +
+                " STOP_FLUSH_COMPLETE\n");
+        }
         private void loadApiKey()
         {
             try
@@ -1034,32 +1086,42 @@ namespace AdamS2T2Docs
 
         }
 
-        private void stopRecord_Click(object sender, EventArgs e)
+        private async void stopRecord_Click(object sender, EventArgs e)
         {
-           
+            stopRecordButton.Enabled = false;
+            labelStatus.Text = "Stopping...";
+
             if (soundIn.RecordingState == RecordingState.Recording)
             {
                 label1.Invoke(new Action(() => { label1.Text = "recording state is Recording"; }));
-                soundIn.Stop(); 
+                soundIn.Stop();
             }
 
-            if (webSocket.State == WebSocketState.Open && webSocket.Handshaked)
+            if (webSocket != null && webSocket.State == WebSocketState.Open && webSocket.Handshaked)
             {
-               Task taskA = Task.Run(() => webSocket.Close());
-                Task taskB = Task.Run(() => webSocket.Dispose());
-               taskA.Wait();
-                taskB.Wait();
+                await Task.Run(() => webSocket.Close());
+                await Task.Run(() => webSocket.Dispose());
             }
-                
-            isWebsocketServing = false;  
-            
+
+            isWebsocketServing = false;
+
+            labelStatus.Text = "Stopping: flushing docs queue...";
+
+            try
+            {
+                await FlushPendingDocsBufferAsync();
+            }
+            catch (Exception ex)
+            {
+                File.AppendAllText("logs/googleErrors.txt",
+                    DateTime.Now + "\nStop flush failed:\n" +
+                    ex.Message + "\n" + ex.StackTrace + "\n\n");
+            }
+
             audioSourceGroupBox.Visible = false;
             stopRecordButton.Enabled = false;
             startRecordButton.Enabled = true;
             timer1.Enabled = false;
-            //stopTimer();
-
-
         }
 
 
