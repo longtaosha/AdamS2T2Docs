@@ -43,10 +43,11 @@ namespace AdamS2T2Docs
         private bool isAiProofreadEnabled = true;
         private QwenProofreader qwenProofreader;
         private readonly SemaphoreSlim _aiSemaphore = new SemaphoreSlim(1, 1);
+        private readonly SemaphoreSlim _googleDirectSemaphore = new SemaphoreSlim(1, 1);
+
         private string _proofreadContext = "";
         private const int ProofreadContextMaxChars = 300;
-        private string _pendingShortFinalText = "";
-        private const int ShortFragmentWordThreshold = 5;
+
         private string _googleDocsProofreadBuffer = "";
         private const int GoogleDocsProofreadMinWords = 12;
 
@@ -57,7 +58,10 @@ namespace AdamS2T2Docs
         private readonly object _pendingGoogleDocsQueueLock = new object();
         private bool _isGoogleDocsWorkerRunning = false;
         private DateTime _lastFinalSegmentTime = DateTime.MinValue;
-        private const int GoogleDocsIdleFlushSeconds = 2;
+        private int googleDocsIdleFlushSeconds = 6;
+        private int googleDocsAppendTimeoutSeconds = 20;
+        private bool useGoogleDocsQueue = true;
+        private bool filterChineseFinalText = false;
         private DateTime _lastFinalArrivalTime = DateTime.MinValue;
         private bool _pendingCommaAfterPause = false;
 
@@ -100,6 +104,7 @@ namespace AdamS2T2Docs
         private System.Timers.Timer gTimer;
         private bool isGoogleError = false;
         private bool isOutputGoogleJustFinalResult = true;
+
 
         public Form1()
         {
@@ -170,7 +175,7 @@ namespace AdamS2T2Docs
                     }
 
                     // auto restart worker if queue exists
-                    if (queueCount > 0 && !_isGoogleDocsWorkerRunning)
+                    if (useGoogleDocsQueue && queueCount > 0 && !_isGoogleDocsWorkerRunning)
                     {
                         _ = ProcessGoogleDocsQueueAsync();
                     }
@@ -180,26 +185,40 @@ namespace AdamS2T2Docs
                     // flush remaining docs buffer into queue
                     if (!string.IsNullOrWhiteSpace(_googleDocsProofreadBuffer) &&
                         _lastFinalSegmentTime != DateTime.MinValue &&
-                        (DateTime.Now - _lastFinalSegmentTime).TotalSeconds >= GoogleDocsIdleFlushSeconds)
+                        (DateTime.Now - _lastFinalSegmentTime).TotalSeconds >= googleDocsIdleFlushSeconds)
                     {
                         string docsRawText = _googleDocsProofreadBuffer;
                         _googleDocsProofreadBuffer = "";
 
-                        lock (_pendingGoogleDocsQueueLock)
+                        if (useGoogleDocsQueue)
                         {
-                            _pendingGoogleDocsQueue.AddLast(docsRawText);
+                            lock (_pendingGoogleDocsQueueLock)
+                            {
+                                _pendingGoogleDocsQueue.AddLast(docsRawText);
 
+                                File.AppendAllText(
+                                    "logs/googleQueue.txt",
+                                    DateTime.Now +
+                                    " IDLE_FLUSH_ENQUEUE len=" +
+                                    docsRawText.Length +
+                                    " queue=" +
+                                    _pendingGoogleDocsQueue.Count +
+                                    "\n");
+                            }
+
+                            _ = ProcessGoogleDocsQueueAsync();
+                        }
+                        else
+                        {
                             File.AppendAllText(
                                 "logs/googleQueue.txt",
                                 DateTime.Now +
-                                " IDLE_FLUSH_ENQUEUE len=" +
+                                " IDLE_FLUSH_DIRECT len=" +
                                 docsRawText.Length +
-                                " queue=" +
-                                _pendingGoogleDocsQueue.Count +
                                 "\n");
-                        }
 
-                        _ = ProcessGoogleDocsQueueAsync();
+                            _ = SendDocsTextDirectlyAsync(docsRawText);
+                        }
 
                         // prevent repeated idle flush
                         _lastFinalSegmentTime = DateTime.MinValue;
@@ -391,6 +410,39 @@ namespace AdamS2T2Docs
 
                             string finalText = result[1];
 
+                            if (language == "cn")
+                            {
+                                finalText = NormalizeChinesePunctuation(finalText);
+
+                                if (filterChineseFinalText && ContainsChinese(finalText))
+                                {
+                                    string originalFinalText = finalText;
+
+                                    finalText = RemoveChineseTextAndNormalizePunctuation(finalText);
+
+                                    bool hasContinuousEnglish =
+                                        HasContinuousEnglishPhrase(finalText, 5);
+
+                                    File.AppendAllText("logs/chineseFiltered.txt",
+                                        DateTime.Now + "\nFILTERED_CN_FINAL:\n" +
+                                        "RAW : " + originalFinalText + "\n" +
+                                        "KEPT: " + finalText + "\n" +
+                                        "CONTINUOUS_5: " + hasContinuousEnglish + "\n");
+
+                                    if (string.IsNullOrWhiteSpace(finalText) ||
+                                        !hasContinuousEnglish)
+                                    {
+                                        File.AppendAllText("logs/chineseFiltered.txt",
+                                            "FILTER_DROP\n\n");
+
+                                        return;
+                                    }
+
+                                    File.AppendAllText("logs/chineseFiltered.txt",
+                                        "FILTER_KEEP\n\n");
+                                }
+                            }
+
                             // pause-comma logic:
                             // if long pause and neither side has punctuation,
                             // prepend comma to current segment
@@ -419,69 +471,7 @@ namespace AdamS2T2Docs
                             _lastFinalArrivalTime = DateTime.Now;
                             _lastFinalSegmentTime = DateTime.Now;
                             int wordCount = CountWordsForProofread(finalText);
-                            // 短 fragment：先暂存，等待下一段
-                            /* *****
-                            if (wordCount > 0 &&
-                                wordCount < ShortFragmentWordThreshold &&
-                                string.IsNullOrWhiteSpace(_pendingShortFinalText))
-                            {
-                                _pendingShortFinalText = finalText;
-                                return;
-                            }
-                            *******/
-                            // pending short
-                            /*
-                            if (!string.IsNullOrWhiteSpace(_pendingShortFinalText))
-                            {
-                                string pendingText = _pendingShortFinalText;
-                                _pendingShortFinalText = "";
-
-                                string lookaheadContext = _proofreadContext + pendingText + finalText;
-
-                                File.AppendAllText("logs/qwen-proofread.txt",
-                                    DateTime.Now + "\nRAW_PENDING: " + pendingText + "\nLOOKAHEAD: " + finalText + "\n");
-
-                                ProofreadResult pendingProof = null;
-                                if (isAiProofreadEnabled && qwenProofreader != null)
-                                {
-                                    await _aiSemaphore.WaitAsync();
-                                    try
-                                    {                                        
-                                        pendingProof = await qwenProofreader.ProofreadAsync(pendingText, lookaheadContext);
-                                        pendingText = pendingProof.CorrectedText;
-                                    }
-                                    finally
-                                    {
-                                        _aiSemaphore.Release();
-                                    }
-                                }
-
-                                File.AppendAllText("logs/qwen-proofread.txt",
-                                "AI_PENDING : " + pendingText + "\n" +
-                                "CONF_PENDING: " + (pendingProof != null ? pendingProof.Confidence.ToString() : "N/A") + "\n" +
-                                "NEED_MORE_PENDING: " + (pendingProof != null ? pendingProof.NeedMoreContext.ToString() : "N/A") + "\n\n");
-
-                                richTextBox1?.Invoke(new Action(() =>
-                                {
-                                    richTextBox1.SelectedText = pendingText;
-                                    richTextBox1.DeselectAll();
-                                }));
-
-                                _proofreadContext += pendingText;
-
-                                if (_proofreadContext.Length > ProofreadContextMaxChars)
-                                {
-                                    _proofreadContext = _proofreadContext.Substring(
-                                        _proofreadContext.Length - ProofreadContextMaxChars);
-                                }
-
-                                if (!isGoogleError && isOutputGoogleJustFinalResult)
-                                {
-                                    await connectToGoogle.connectFinalResultAsync(0, pendingText);
-                                }
-                            }
-                            // end of pending short
-                            */
+                          
 
                             File.AppendAllText("logs/qwen-proofread.txt", DateTime.Now + "\nRAW_UI: " + finalText + "\n\n");
 
@@ -491,23 +481,11 @@ namespace AdamS2T2Docs
 
                             richTextBox1?.Invoke(new Action(() =>
                             {
-                                //richTextBox1.SelectedText = "";
-                                //richTextBox1.AppendText(result[1]);
-                                //richTextBox1.SelectedText = result[4]+": "+result[1];//testing speaker indentification
                                 richTextBox1.SelectedText = finalText;
                                 richTextBox1.DeselectAll();
                             }));
 
-                            //File.AppendAllText("logs/resultFromXunfei.txt", "seg_id: "+result[2]+" type = " + result[0] + ": " + "is1st= " + isToNewLine +": "+result[1]+"\n\n");
-                            //File.AppendAllText("logs/finalResultCNandEN.txt", result[1]+"\n");
-                            //File.AppendAllText("logs/finalResultCNandEN.txt", dataWithoutQuotes + "\n");
-                            //string line = result[1].Replace("'", "\\'");
-                            //string query = "INSERT INTO `rawscript` (`seg_id`, `type`, `line`, `newlinemark`) VALUES (" +
-                            //result[2] + ", " + 0 + ", '" + line + "' ," + isToNewLine+ " );";
-                            //string query2 = "INSERT INTO `finalresult` (`line`) VALUES (" + "'" + line + "'" + " );";
-                            //if (mySqlConnection.State == System.Data.ConnectionState.Closed) mySqlConnection.Open();
-                            //MySqlCommand adamCommand = new MySqlCommand(query, mySqlConnection);
-                            //adamCommand.ExecuteNonQuery();
+                   
                             isToNewLineForGoogle = isToNewLine;
                             isToNewLine = true;
 
@@ -518,30 +496,7 @@ namespace AdamS2T2Docs
                                 _proofreadContext = _proofreadContext.Substring(
                                     _proofreadContext.Length - ProofreadContextMaxChars);
                             }
-
-
-                            /*if (!isGoogleError)
-                            {
-                                if (isOutputGoogleJustFinalResult)
-                                {
-                                    await connectToGoogle.connectFinalResultAsync(0, finalText);
-                                }
-                                else
-                                {
-                                    try
-                                    {
-                                        await connectToGoogle.connectOnlyWaitFinalAsync(0, finalText, isToNewLineForGoogle);
-                                    }
-                                    catch (Exception eGoogle)
-                                    {
-                                        isGoogleError = true;
-                                        File.AppendAllText("logs/googleErrors.txt", DateTime.Now.ToString() + "\n"
-                                            + eGoogle.Message.ToString() + eGoogle.StackTrace + "\n");
-                                        MessageBox.Show(eGoogle.Message.ToString() + eGoogle.StackTrace);
-
-                                    }
-                                }
-                            }*/
+                           
 
                             _googleDocsProofreadBuffer += finalText;
 
@@ -553,96 +508,38 @@ namespace AdamS2T2Docs
                                 string docsText = docsRawText;
                                 _googleDocsProofreadBuffer = "";
 
-                                lock (_pendingGoogleDocsQueueLock)
+                                if (useGoogleDocsQueue)
                                 {
-                                    _pendingGoogleDocsQueue.AddLast(docsRawText);
+                                    lock (_pendingGoogleDocsQueueLock)
+                                    {
+                                        _pendingGoogleDocsQueue.AddLast(docsRawText);
 
+                                        File.AppendAllText(
+                                            "logs/googleQueue.txt",
+                                            DateTime.Now +
+                                            " ENQUEUE len=" +
+                                            docsRawText.Length +
+                                            " queue=" +
+                                            _pendingGoogleDocsQueue.Count +
+                                            "\n");
+                                    }
+
+                                    _ = ProcessGoogleDocsQueueAsync();
+                                }
+                                else
+                                {
                                     File.AppendAllText(
                                         "logs/googleQueue.txt",
                                         DateTime.Now +
-                                        " ENQUEUE len=" + docsRawText.Length +
-                                        " queue=" + _pendingGoogleDocsQueue.Count + "\n");
+                                        " DIRECT len=" +
+                                        docsRawText.Length +
+                                        "\n");
+
+                                    _ = SendDocsTextDirectlyAsync(docsRawText);
                                 }
-
-                                _ = ProcessGoogleDocsQueueAsync();
-                                /*
-// Temporarily disabled:
-// AI proofreading + Google Docs writing will be moved to a background worker.
-
-                            ProofreadResult docsProof = null;
-
-                            if (isAiProofreadEnabled && qwenProofreader != null)
-                            {
-                                await _aiSemaphore.WaitAsync();
-                                try
-                                {
-                                    try
-                                    {
-                                        docsProof = await qwenProofreader.ProofreadAsync(
-                                            docsText,
-                                            _proofreadContext);
-                                    }
-                                    finally
-                                    {
-                                        ClearBusyStage("Qwen Proofread");
-                                    }
-                                }
-                                finally
-                                {
-                                    _aiSemaphore.Release();
-                                }
-
-                                docsText = docsProof.CorrectedText;
+                               
                             }
-
-                            File.AppendAllText("logs/qwen-proofread-docs-buffer.txt",
-                            DateTime.Now + "\n" +
-                            "DOCS_RAW: " + docsRawText + "\n" +
-                            "DOCS_AI : " + docsText + "\n\n");
-
-                            if (!isGoogleError)
-                            {
-                                try
-                                {
-                                    SetBusyStage("Google Docs Append");
-                                    try
-                                    {
-                                        await connectToGoogle.connectFinalResultAsync(0, docsText);
-                                    }
-                                    finally
-                                    {
-                                        ClearBusyStage("Google Docs Append");
-                                    }
-                                }
-                                catch (TaskCanceledException ex)
-                                {
-                                    _googleDocsProofreadBuffer = docsText + _googleDocsProofreadBuffer;
-
-                                    File.AppendAllText("logs/googleErrors.txt",
-                                        DateTime.Now + "\nGoogle Docs timeout/canceled, requeued docsText:\n" +
-                                        docsText + "\n" +
-                                        ex.Message + "\n" + ex.StackTrace + "\n\n");
-                                }
-                                catch (Exception ex)
-                                {
-                                    //isGoogleError = true;
-
-                                    File.AppendAllText("logs/googleErrors.txt",
-                                        DateTime.Now + "\nGoogle Docs error:\n" +
-                                        ex.Message + "\n" + ex.StackTrace + "\n\n");
-                                }
-                            }
-                                */
-                            }
-
-                            //mySqlConnection.Close();
-
-
-
-                            //await connectToGoogle.connectNewAsync(0, result[1]);
-                            //await connectToGoogle.connectReplaceTextAsync(0, result[1], result[2]);
-                            //connectToGoogle.connectFinalResultAsync(0, result[1]);
-                            //await connectToGoogle.connectAsync(0, result[1]);
+                           
                         }
                         else if (result[0].Equals("1") && result[1] != null)
                         {
@@ -784,7 +681,93 @@ namespace AdamS2T2Docs
 
             return words.Length;
         }
+        private bool HasContinuousEnglishPhrase(
+        string text,
+        int minWords = 5)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return false;
 
+            var matches =
+                System.Text.RegularExpressions.Regex.Matches(
+                    text,
+                    @"[A-Za-z]+(?:['\-][A-Za-z]+)?");
+
+            int consecutive = 0;
+
+            foreach (System.Text.RegularExpressions.Match m in matches)
+            {
+                consecutive++;
+
+                if (consecutive >= minWords)
+                    return true;
+            }
+
+            return false;
+        }
+        private bool ContainsChinese(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return false;
+
+            foreach (char c in text)
+            {
+                if (c >= '\u4e00' && c <= '\u9fff')
+                    return true;
+            }
+
+            return false;
+        }
+        private string NormalizeChinesePunctuation(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            string result = text;
+
+            result = result.Replace("，", ", ")
+                           .Replace("。", ". ")
+                           .Replace("？", "? ")
+                           .Replace("！", "! ")
+                           .Replace("；", "; ")
+                           .Replace("：", ": ")
+                           .Replace("（", "(")
+                           .Replace("）", ")")
+                           .Replace("“", "\"")
+                           .Replace("”", "\"")
+                           .Replace("‘", "'")
+                           .Replace("’", "'")
+                           .Replace("、", ", ");
+
+            // collapse accidental double spaces
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result,
+                @"\s+",
+                " ");
+
+            return result.Trim();
+        }
+        private string RemoveChineseTextAndNormalizePunctuation(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            string result = NormalizeChinesePunctuation(text);
+
+            // Remove Chinese characters only
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result,
+                @"[\u4e00-\u9fff]+",
+                " ");
+
+            // Normalize spaces
+            result = System.Text.RegularExpressions.Regex.Replace(
+                result,
+                @"\s+",
+                " ");
+
+            return result.Trim();
+        }
         private void SetBusyStage(string stage)
         {
             lock (_busyStageLock)
@@ -810,6 +793,77 @@ namespace AdamS2T2Docs
 
             File.AppendAllText("logs/runtime-stage.txt",
                 DateTime.Now + " EXIT " + stage + " elapsed=" + elapsed.TotalMilliseconds.ToString("0") + "ms\n");
+        }
+
+        private async Task SendDocsTextDirectlyAsync(string docsRawText)
+        {
+            if (string.IsNullOrWhiteSpace(docsRawText))
+                return;
+
+            await _googleDirectSemaphore.WaitAsync();
+
+            try
+            {
+                string docsText = docsRawText;
+                ProofreadResult docsProof = null;
+
+                if (isAiProofreadEnabled && qwenProofreader != null)
+                {
+                    await _aiSemaphore.WaitAsync();
+                    try
+                    {
+                        SetBusyStage("Qwen Proofread Direct");
+                        try
+                        {
+                            docsProof = await qwenProofreader.ProofreadAsync(
+                                docsText,
+                                _proofreadContext);
+                        }
+                        finally
+                        {
+                            ClearBusyStage("Qwen Proofread Direct");
+                        }
+                    }
+                    finally
+                    {
+                        _aiSemaphore.Release();
+                    }
+
+                    docsText = docsProof.CorrectedText;
+                }
+
+                File.AppendAllText("logs/qwen-proofread-docs-buffer.txt",
+                    DateTime.Now + "\n" +
+                    "DOCS_RAW_DIRECT: " + docsRawText + "\n" +
+                    "DOCS_AI_DIRECT : " + docsText + "\n\n");
+
+                SetBusyStage("Google Docs Direct Append");
+                try
+                {
+                    await connectToGoogle.connectFinalResultAsync(0, docsText);
+
+                    File.AppendAllText(
+                        "logs/googleAppendSuccess.txt",
+                        DateTime.Now + "\n" +
+                        "GOOGLE_APPEND_DIRECT:\n" +
+                        docsText + "\n\n");
+                }
+                finally
+                {
+                    ClearBusyStage("Google Docs Direct Append");
+                }
+            }
+            catch (Exception ex)
+            {
+                File.AppendAllText("logs/googleErrors.txt",
+                    DateTime.Now + "\nGoogle Docs direct write failed:\n" +
+                    docsRawText + "\n" +
+                    ex.Message + "\n" + ex.StackTrace + "\n\n");
+            }
+            finally
+            {
+                _googleDirectSemaphore.Release();
+            }
         }
 
         private async Task ProcessGoogleDocsQueueAsync()
@@ -882,16 +936,25 @@ namespace AdamS2T2Docs
                         try
                         {
                             Task googleTask = connectToGoogle.connectFinalResultAsync(0, docsText);
-                            Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(5));
+                            Task timeoutTask = Task.Delay(TimeSpan.FromSeconds(googleDocsAppendTimeoutSeconds)); ;
 
                             Task completedTask = await Task.WhenAny(googleTask, timeoutTask);
 
                             if (completedTask == timeoutTask)
                             {
-                                throw new TimeoutException("Google Docs append timed out after 5 seconds.");
+                                throw new TimeoutException(
+                            "Google Docs append timed out after " +
+                            googleDocsAppendTimeoutSeconds +
+                            " seconds.");
                             }
 
                             await googleTask;
+
+                            File.AppendAllText(
+                                "logs/googleAppendSuccess.txt",
+                                DateTime.Now + "\n" +
+                                "GOOGLE_APPEND:\n" +
+                                docsText + "\n\n");
                         }
                         finally
                         {
@@ -928,43 +991,61 @@ namespace AdamS2T2Docs
                 string docsRawText = _googleDocsProofreadBuffer;
                 _googleDocsProofreadBuffer = "";
 
-                lock (_pendingGoogleDocsQueueLock)
+                if (useGoogleDocsQueue)
                 {
-                    _pendingGoogleDocsQueue.AddLast(docsRawText);
+                    lock (_pendingGoogleDocsQueueLock)
+                    {
+                        _pendingGoogleDocsQueue.AddLast(docsRawText);
 
+                        File.AppendAllText(
+                            "logs/googleQueue.txt",
+                            DateTime.Now +
+                            " STOP_FLUSH_ENQUEUE len=" +
+                            docsRawText.Length +
+                            " queue=" +
+                            _pendingGoogleDocsQueue.Count +
+                            "\n");
+                    }
+                }
+                else
+                {
                     File.AppendAllText(
                         "logs/googleQueue.txt",
                         DateTime.Now +
-                        " STOP_FLUSH_ENQUEUE len=" +
+                        " STOP_FLUSH_DIRECT len=" +
                         docsRawText.Length +
-                        " queue=" +
-                        _pendingGoogleDocsQueue.Count +
                         "\n");
+
+                    await SendDocsTextDirectlyAsync(docsRawText);
                 }
             }
 
             // make sure worker starts
-            await ProcessGoogleDocsQueueAsync();
-
-            // wait queue drain
-            while (true)
+            if (useGoogleDocsQueue)
             {
-                bool queueEmpty;
-                bool workerRunning;
-
-                lock (_pendingGoogleDocsQueueLock)
+                await ProcessGoogleDocsQueueAsync();
+                // wait queue drain
+                while (true)
                 {
-                    queueEmpty =
-                        _pendingGoogleDocsQueue.Count == 0;
+                    bool queueEmpty;
+                    bool workerRunning;
+
+                    lock (_pendingGoogleDocsQueueLock)
+                    {
+                        queueEmpty =
+                            _pendingGoogleDocsQueue.Count == 0;
+                    }
+
+                    workerRunning = _isGoogleDocsWorkerRunning;
+
+                    if (queueEmpty && !workerRunning)
+                        break;
+
+                    await Task.Delay(200);
                 }
-
-                workerRunning = _isGoogleDocsWorkerRunning;
-
-                if (queueEmpty && !workerRunning)
-                    break;
-
-                await Task.Delay(200);
             }
+
+            
 
             File.AppendAllText(
                 "logs/googleQueue.txt",
@@ -993,7 +1074,38 @@ namespace AdamS2T2Docs
                 qwenApiKey = d.qwenApiKey;
                 qwenBaseUrl = d.qwenBaseUrl;
                 qwenModel = d.qwenModel;
+                try
+                {
+                    if (d.useGoogleDocsQueue != null)
+                        useGoogleDocsQueue = (bool)d.useGoogleDocsQueue;
+                }
+                catch
+                {
+                    useGoogleDocsQueue = true;
+                }
 
+                try
+                {
+                    if (d.googleDocsIdleFlushSeconds != null)
+                        googleDocsIdleFlushSeconds = (int)d.googleDocsIdleFlushSeconds;
+
+                    if (d.googleDocsAppendTimeoutSeconds != null)
+                        googleDocsAppendTimeoutSeconds = (int)d.googleDocsAppendTimeoutSeconds;
+                }
+                catch
+                {
+                    googleDocsIdleFlushSeconds = 6;
+                    googleDocsAppendTimeoutSeconds = 20;
+                }
+                try
+                {
+                    if (d.filterChineseFinalText != null)
+                        filterChineseFinalText = (bool)d.filterChineseFinalText;
+                }
+                catch
+                {
+                    filterChineseFinalText = false;
+                }
             }
             catch (Exception e)
             {
@@ -1253,145 +1365,8 @@ namespace AdamS2T2Docs
 
             }
 
-        }
-
-        
-     /*   private async void gTimedEvent(object sender, ElapsedEventArgs e)
-        {
-            if (isPushedToGoogle == false)
-            {
-                isPushedToGoogle = true;
-                string query = "SELECT * FROM `rawscript` WHERE `seg_id` = " + segidForTimer;
-                if (gSqlConnection.State == System.Data.ConnectionState.Closed) gSqlConnection.Open();
-                MySqlCommand gCommand = new MySqlCommand(query, gSqlConnection);
-                gCommand.ExecuteNonQuery();
-                MySqlDataReader gReader = gCommand.ExecuteReader();
-                int seg_id = 0;
-                int type = 0;
-                string line = "";
-                bool isToNewLine = true;
-                if (gReader.Read())
-                {
-                    seg_id = gReader.GetInt16("seg_id");
-                    type = gReader.GetInt16("type");
-                    line = gReader.GetString("line");
-                    isToNewLine = gReader.GetBoolean("newlinemark");
-                    readFromMysqlSucceeded = true;
-                }
-                else
-                {
-                    readFromMysqlSucceeded = false;
-                    isPushedToGoogle = false;
-                    gReader.Close();
-                    gCommand.Dispose();
-                    return;
-                }
-
-                gReader.Close();
-                gCommand.Dispose();
-
-                if (readFromMysqlSucceeded && ((segidForTimer - lastSegid == 1) || segidForTimer == 0))
-                {
-                    lastSegid = segidForTimer;
-                    if (isToNewLine == true)
-                    {
-                        await connectToGoogle.connectTimerAsync(seg_id, isToNewLine, type, "  --");
-                        segidForTimer++;
-                        isPushedToGoogle = false;
-                        return;
-                    }
-                    else
-                    {
-                        switch (type)
-                        {
-                            case 1:
-                                {
-                                    if (isToWrite == true)
-                                    {
-                                        await connectToGoogle.connectTimerAsync(seg_id, isToNewLine, type, line);
-                                        File.AppendAllText("logs/callFrom-gTimer.txt", segidForTimer + ".vs." + seg_id + ": " + isToNewLine + " type=" + type + ": " + line + "\n");
-                                        segidForTimer++;
-                                        isPushedToGoogle = false;
-                                    }
-                                }
-                                break;
-                            case 0:
-                                {
-
-                                    await connectToGoogle.connectTimerAsync(seg_id, isToNewLine, type, line);
-                                    File.AppendAllText("logs/callFrom-gTimer.txt", segidForTimer + ".vs." + seg_id + ": " + isToNewLine + " type=" + type + ": " + line + "\n");
-                                    if (await connectToGoogle.checkNamedRangeDeleteUpdateAsync())
-                                    {
-                                        isToWrite = true;
-                                        segidForTimer++;
-                                        isPushedToGoogle = false;
-                                    }
-                                    else
-                                    {
-                                        isToWrite = false;
-                                        isPushedToGoogle = false;
-                                        return;
-                                    }
-                                }
-                                break;
-                        }
-                    }
-
-                }
-            }
-            else return;
-
-
-
-            /*if (line.Length > 0)
-            {
-                if (isToWrite == true)
-                {
-                    File.AppendAllText("logs/gTimerRead.txt", seg_id + " - " + type + " : " + line + "\n");
-                    isToWrite = false;
-                    await connectToGoogle.connectTimerAsync(seg_id, type, line);
-                }
-
-                if (segidForTimer == 0)
-                {
-                    if (await connectToGoogle.checkUpdate("  --" + line, (int)myWatch.ElapsedMilliseconds))
-                    {
-                        segidForTimer++;
-                        isToWrite = true;
-                        File.AppendAllText("logs/callForCheckFrom-gTimer.txt", "  --" + "\n");
-                    }
-
-                }
-                else
-                {
-                    query = "SELECT * FROM `rawscript` WHERE `seg_id` = " + (segidForTimer - 1);
-                    if (gSqlConnection.State == System.Data.ConnectionState.Closed) gSqlConnection.Open();
-                    gCommand = new MySqlCommand(query, gSqlConnection);
-                    gCommand.ExecuteNonQuery();
-                    gReader = gCommand.ExecuteReader();
-                    if (gReader.Read())
-                    {
-                        line = gReader.GetString("line");
-                    }
-                    gReader.Close();
-                    gCommand.Dispose();
-
-                    if (await connectToGoogle.checkUpdate(line, (int)myWatch.ElapsedMilliseconds))
-                    {
-                        segidForTimer++;
-                        isToWrite = true;
-                        File.AppendAllText("logs/callForCheckFrom-gTimer.txt", line + "\n");
-                    }
-                    else
-                    {
-                        File.AppendAllText("logs/callForCheckFrom-gTimerfailed.txt", line + "\n");
-                    }
-
-                }
-            }
-        }
-    */
-
+        }        
+     
         private void labelTime_Click(object sender, EventArgs e)
         {
 
