@@ -80,6 +80,17 @@ namespace AdamS2T2Docs
             }
 
             string coreText = text.Substring(start, end - start + 1);
+            // boundary-only fragment:
+            // avoid sending empty coreText to AI
+            if (string.IsNullOrWhiteSpace(coreText))
+            {
+                return new ProofreadResult
+                {
+                    CorrectedText = text,
+                    Confidence = 1.0,
+                    NeedMoreContext = false
+                };
+            }
 
 
             if (string.IsNullOrWhiteSpace(_apiKey) || string.IsNullOrWhiteSpace(_baseUrl))
