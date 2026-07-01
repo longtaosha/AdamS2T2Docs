@@ -360,7 +360,7 @@ namespace AdamS2T2Docs
                                 }
                             }
 
-                            finalText = EnsureFinalSegmentBoundarySpacing(
+                            finalText = EnsureSegmentBoundarySpacing(
                                 _proofreadContext,
                                 finalText);
 
@@ -466,24 +466,42 @@ namespace AdamS2T2Docs
                         {
                             richTextBox1.Invoke(new Action(() =>
                             {
+                                string partialText;
 
                                 if (isFirstAppend == true)
                                 {
-                                    richTextBox1.AppendText(result[1]);
+                                    partialText = EnsureSegmentBoundarySpacing(
+                                        richTextBox1.Text,
+                                        result[1]);
+                                    richTextBox1.AppendText(partialText);
                                     isFirstAppend = false;
                                     label1.Invoke(new Action(() => { label1.Text = "first appended "; }));
                                     isToNewLine = true;
                                 }
                                 else
                                 {
-                                    richTextBox1.SelectedText = result[1];
+                                    string priorText = "";
+
+                                    if (richTextBox1.SelectionStart > 0)
+                                    {
+                                        priorText = richTextBox1.Text.Substring(
+                                            0,
+                                            richTextBox1.SelectionStart);
+                                    }
+
+                                    partialText = EnsureSegmentBoundarySpacing(
+                                        priorText,
+                                        result[1]);
+                                    richTextBox1.SelectedText = partialText;
                                     label1.Invoke(new Action(() => { label1.Text = "not first appended " + dataSize; }));
 
                                 }
 
-                                if (richTextBox1.Text.Length >= result[1].Length)
+                                if (richTextBox1.Text.Length >= partialText.Length)
                                 {
-                                    richTextBox1.Select(richTextBox1.Text.Length - result[1].Length, result[1].Length);
+                                    richTextBox1.Select(
+                                        richTextBox1.Text.Length - partialText.Length,
+                                        partialText.Length);
                                 }
 
                                 //label1.Invoke(new Action(() => { label1.Text = "the last length is " + lastTextLength + " + result length is: " + result[1].Length+" = Text Length is: " + richTextBox1.Text.Length +" SlectedText Length is:"+richTextBox1.SelectedText.Length; }));
@@ -582,7 +600,7 @@ namespace AdamS2T2Docs
                    c == '\r';
         }
 
-        private string EnsureFinalSegmentBoundarySpacing(string priorText, string currentText)
+        private string EnsureSegmentBoundarySpacing(string priorText, string currentText)
         {
             if (string.IsNullOrEmpty(priorText) || string.IsNullOrEmpty(currentText))
                 return currentText;
@@ -593,8 +611,20 @@ namespace AdamS2T2Docs
             char previous = priorText[priorText.Length - 1];
             char current = currentText[0];
 
+            if (char.IsWhiteSpace(previous))
+                return currentText;
+
+            if (StartsWithBoundaryPunctuation(currentText))
+                return currentText;
+
             if (char.IsLetterOrDigit(previous) && char.IsLetterOrDigit(current))
                 return " " + currentText;
+
+            if (EndsWithBoundaryPunctuation(priorText) &&
+                (char.IsLetterOrDigit(current) || current == '"' || current == '\''))
+            {
+                return " " + currentText;
+            }
 
             return currentText;
         }
