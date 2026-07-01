@@ -58,6 +58,8 @@ namespace AdamS2T2Docs
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.buttonCaption = new System.Windows.Forms.Button();
             this.labelStatus = new System.Windows.Forms.Label();
+            this.sttProviderLabel = new System.Windows.Forms.Label();
+            this.sttProviderComboBox = new System.Windows.Forms.ComboBox();
             this.proofreadProviderLabel = new System.Windows.Forms.Label();
             this.proofreadProviderComboBox = new System.Windows.Forms.ComboBox();
             this.audioSourceGroupBox.SuspendLayout();
@@ -97,6 +99,7 @@ namespace AdamS2T2Docs
             // 
             // stopRecordButton
             // 
+            this.stopRecordButton.Enabled = false;
             this.stopRecordButton.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(134)));
             this.stopRecordButton.Location = new System.Drawing.Point(475, 449);
             this.stopRecordButton.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
@@ -409,6 +412,30 @@ namespace AdamS2T2Docs
             this.labelStatus.TabIndex = 25;
             this.labelStatus.Text = "Idle";
             // 
+            // sttProviderLabel
+            // 
+            this.sttProviderLabel.AutoSize = true;
+            this.sttProviderLabel.Location = new System.Drawing.Point(357, 55);
+            this.sttProviderLabel.Margin = new System.Windows.Forms.Padding(1, 0, 1, 0);
+            this.sttProviderLabel.Name = "sttProviderLabel";
+            this.sttProviderLabel.Size = new System.Drawing.Size(31, 13);
+            this.sttProviderLabel.TabIndex = 28;
+            this.sttProviderLabel.Text = "STT:";
+            // 
+            // sttProviderComboBox
+            // 
+            this.sttProviderComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.sttProviderComboBox.FormattingEnabled = true;
+            this.sttProviderComboBox.Items.AddRange(new object[] {
+            "XFYun",
+            "Azure"});
+            this.sttProviderComboBox.Location = new System.Drawing.Point(391, 51);
+            this.sttProviderComboBox.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.sttProviderComboBox.Name = "sttProviderComboBox";
+            this.sttProviderComboBox.Size = new System.Drawing.Size(70, 21);
+            this.sttProviderComboBox.TabIndex = 29;
+            this.sttProviderComboBox.SelectedIndexChanged += new System.EventHandler(this.sttProviderComboBox_SelectedIndexChanged);
+            // 
             // proofreadProviderLabel
             //
             this.proofreadProviderLabel.AutoSize = true;
@@ -440,6 +467,8 @@ namespace AdamS2T2Docs
             this.ClientSize = new System.Drawing.Size(827, 490);
             this.Controls.Add(this.proofreadProviderComboBox);
             this.Controls.Add(this.proofreadProviderLabel);
+            this.Controls.Add(this.sttProviderComboBox);
+            this.Controls.Add(this.sttProviderLabel);
             this.Controls.Add(this.labelStatus);
             this.Controls.Add(this.buttonCaption);
             this.Controls.Add(this.audioSourceGroupBox);
@@ -507,6 +536,8 @@ namespace AdamS2T2Docs
         private System.Windows.Forms.TabPage tabPage2;
         private System.Windows.Forms.Button buttonCaption;
         private System.Windows.Forms.Label labelStatus;
+        private System.Windows.Forms.Label sttProviderLabel;
+        private System.Windows.Forms.ComboBox sttProviderComboBox;
         private System.Windows.Forms.Label proofreadProviderLabel;
         private System.Windows.Forms.ComboBox proofreadProviderComboBox;
     }

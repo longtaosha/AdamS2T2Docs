@@ -42,8 +42,16 @@ namespace AdamS2T2Docs
         private string azureOpenAiEndpoint;
         private string azureOpenAiDeployment;
         private string azureOpenAiApiVersion;
+        private string azureSpeechKey;
+        private string azureSpeechRegion;
+        private string azureSpeechEndpoint;
+        private string azureSpeechLanguage;
+        private int azureSpeechVadMs;
         private string proofreadProvider = "qwen";
         private string sttProvider = "xfyun";
+        private bool _isApplyingSttProviderSelection;
+        private bool _isRecordingSessionActive;
+        private bool _isStoppingRecordingSession;
         private bool isAiProofreadEnabled = true;
         private IProofreader aiProofreader;
         private ISttEngine sttEngine;
@@ -122,6 +130,7 @@ namespace AdamS2T2Docs
                 InitializeComponent();
                 loadApiKey();
                 InitializeSttEngine();
+                ApplySttProviderSelection();
                 connectToGoogle = new ConnectToGoogle(googleDocsID, typeEffect, copyWordgglID);
                 //connectToGoogleForFakeTyping = new ConnectToGoogle(googleDocsIDForFakeTyping);               
 
@@ -229,6 +238,9 @@ namespace AdamS2T2Docs
             { 
                 // Log an error message with exception details
                 Log.Error(ex, "An error occurred during {OperationName}", "Starting");
+                MessageBox.Show(
+                    GetUserVisibleExceptionMessage(ex),
+                    "Application Startup Error");
 
             }
      
@@ -723,18 +735,30 @@ namespace AdamS2T2Docs
         {
             Directory.CreateDirectory("logs");
 
+            string provider = NormalizeSttProvider(sttProvider);
+            ValidateSttProviderConfig(provider);
+            sttProvider = provider;
+
             if (sttEngine != null)
             {
                 sttEngine.TranscriptReceived -= OnSttTranscriptReceived;
                 sttEngine.StatusChanged -= OnSttStatusChanged;
                 sttEngine.Dispose();
+                sttEngine = null;
             }
-
-            string provider = NormalizeSttProvider(sttProvider);
 
             if (provider == "xfyun")
             {
                 sttEngine = new XfyunSttEngine(appid, apiKey);
+            }
+            else if (provider == "azure")
+            {
+                sttEngine = new AzureSpeechSttEngine(
+                    azureSpeechKey,
+                    azureSpeechRegion,
+                    azureSpeechEndpoint,
+                    azureSpeechLanguage,
+                    azureSpeechVadMs);
             }
             else
             {
@@ -764,14 +788,52 @@ namespace AdamS2T2Docs
                 return "xfyun";
             }
 
+            if (provider == "azure" || provider == "azurestt" ||
+                provider == "azure_stt" || provider == "azure-speech" ||
+                provider == "azurespeech")
+            {
+                return "azure";
+            }
+
             return provider;
+        }
+
+        private void ValidateSttProviderConfig(string provider)
+        {
+            if (provider == "xfyun")
+            {
+                if (string.IsNullOrWhiteSpace(appid) ||
+                    string.IsNullOrWhiteSpace(apiKey))
+                {
+                    throw new InvalidOperationException(
+                        "XFYun STT is selected, but appid or apiKey is missing. Check apikey.json, or set sttProvider to azure.");
+                }
+
+                return;
+            }
+
+            if (provider == "azure")
+            {
+                if (string.IsNullOrWhiteSpace(azureSpeechKey))
+                {
+                    throw new InvalidOperationException(
+                        "Azure STT is selected, but azureSpeechKey is missing. Check apikey.json.");
+                }
+
+                if (string.IsNullOrWhiteSpace(azureSpeechEndpoint) &&
+                    string.IsNullOrWhiteSpace(azureSpeechRegion))
+                {
+                    throw new InvalidOperationException(
+                        "Azure STT is selected, but azureSpeechRegion or azureSpeechEndpoint is missing. Check apikey.json.");
+                }
+            }
         }
 
         private void OnSttStatusChanged(object sender, SttStatusEventArgs e)
         {
             if (e.IsRawProviderMessage && !string.IsNullOrWhiteSpace(e.Message))
             {
-                richTextBox1.Invoke(new Action(() =>
+                richTextBox1.BeginInvoke(new Action(() =>
                 {
                     richTextBox1.AppendText(e.Message + "\n");
                 }));
@@ -782,7 +844,7 @@ namespace AdamS2T2Docs
                 statusText = statusText + ": " + e.Message;
 
             if (label1 != null && !label1.IsDisposed)
-                label1.Invoke(new Action(() => { label1.Text = statusText; }));
+                label1.BeginInvoke(new Action(() => { label1.Text = statusText; }));
 
             if (e.Exception != null)
             {
@@ -857,6 +919,26 @@ namespace AdamS2T2Docs
             return "qwen";
         }
 
+        private void ApplySttProviderSelection()
+        {
+            if (sttProviderComboBox == null)
+                return;
+
+            string provider = NormalizeSttProvider(sttProvider);
+            string selectedItem = provider == "azure" ? "Azure" : "XFYun";
+
+            _isApplyingSttProviderSelection = true;
+            try
+            {
+                if (sttProviderComboBox.Items.Contains(selectedItem))
+                    sttProviderComboBox.SelectedItem = selectedItem;
+            }
+            finally
+            {
+                _isApplyingSttProviderSelection = false;
+            }
+        }
+
         private void ApplyProofreadProviderSelection()
         {
             if (proofreadProviderComboBox == null)
@@ -901,6 +983,17 @@ namespace AdamS2T2Docs
             return "";
         }
 
+        private int ReadFirstJsonInt(dynamic json, params string[] propertyNames)
+        {
+            string value = ReadFirstJsonString(json, propertyNames);
+            int result;
+
+            if (int.TryParse(value, out result))
+                return result;
+
+            return 0;
+        }
+
         private void proofreadProviderComboBox_SelectedIndexChanged(object sender, EventArgs e)
         {
             if (proofreadProviderComboBox.SelectedItem == null)
@@ -917,6 +1010,62 @@ namespace AdamS2T2Docs
 
             proofreadProvider = normalizedProvider;
             InitializeProofreader();
+        }
+
+        private void sttProviderComboBox_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (_isApplyingSttProviderSelection || sttProviderComboBox.SelectedItem == null)
+                return;
+
+            string selectedProvider = sttProviderComboBox.SelectedItem.ToString();
+            string normalizedProvider = NormalizeSttProvider(selectedProvider);
+
+            if (normalizedProvider == sttProvider && sttEngine != null)
+                return;
+
+            bool isRecording =
+                _isRecordingSessionActive ||
+                _isStoppingRecordingSession;
+
+            bool isEngineBusy =
+                sttEngine != null &&
+                sttEngine.State != SttConnectionState.Closed &&
+                sttEngine.State != SttConnectionState.Error;
+
+            if (isRecording || isEngineBusy)
+            {
+                MessageBox.Show(
+                    "Stop recording before switching STT engine.",
+                    "STT Engine",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                ApplySttProviderSelection();
+                return;
+            }
+
+            string previousProvider = sttProvider;
+            sttProvider = normalizedProvider;
+
+            try
+            {
+                InitializeSttEngine();
+                ApplySttProviderSelection();
+                label1.Text = "STT engine: " + sttEngine.ProviderName;
+            }
+            catch (Exception ex)
+            {
+                sttProvider = previousProvider;
+                ApplySttProviderSelection();
+
+                Exception displayException = UnwrapException(ex);
+                Log.Error(displayException, "Failed to switch STT provider");
+                MessageBox.Show(
+                    GetUserVisibleExceptionMessage(displayException),
+                    "STT Engine Switch Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
         }
 
         private string GetProofreadDocsLogLabel(IProofreader proofreader)
@@ -1298,6 +1447,39 @@ namespace AdamS2T2Docs
                     "azureOpenAIApiVersion",
                     "openAiApiVersion",
                     "openAIApiVersion");
+                azureSpeechKey = ReadFirstJsonString(
+                    d,
+                    "azureSpeechKey",
+                    "azureSttKey",
+                    "azureSpeechApiKey",
+                    "azureSpeechSubscriptionKey");
+                azureSpeechRegion = ReadFirstJsonString(
+                    d,
+                    "azureSpeechRegion",
+                    "azureSttRegion",
+                    "speechRegion");
+                azureSpeechEndpoint = ReadFirstJsonString(
+                    d,
+                    "azureSpeechEndpoint",
+                    "azureSttEndpoint",
+                    "speechEndpoint");
+                azureSpeechLanguage = ReadFirstJsonString(
+                    d,
+                    "azureSpeechLanguage",
+                    "azureSttLanguage",
+                    "azureSpeechRecognitionLanguage",
+                    "speechRecognitionLanguage");
+                azureSpeechVadMs = ReadFirstJsonInt(
+                    d,
+                    "vad",
+                    "azureVad",
+                    "azureVadMs",
+                    "azureSpeechVad",
+                    "azureSpeechVadMs",
+                    "azureSttVad",
+                    "azureSttVadMs",
+                    "speechSegmentationSilenceTimeoutMs",
+                    "azureSpeechSegmentationSilenceTimeoutMs");
                 proofreadProvider = ReadFirstJsonString(d, "proofreadProvider", "aiProofreadProvider");
                 if (string.IsNullOrWhiteSpace(proofreadProvider))
                     proofreadProvider = "qwen";
@@ -1337,15 +1519,18 @@ namespace AdamS2T2Docs
                     filterChineseFinalText = false;
                 }
             }
-            catch (Exception e)
+            catch (Exception ex)
             {
-                //
-                
+                Log.Error(ex, "Failed to load apikey.json");
+                throw new InvalidOperationException(
+                    "Failed to load apikey.json. Check the JSON syntax and required settings. " +
+                    ex.Message,
+                    ex);
             }
 
         }
 
-        private void startRecord_Click(object sender, EventArgs e)
+        private async void startRecord_Click(object sender, EventArgs e)
         {
 
             try
@@ -1355,7 +1540,7 @@ namespace AdamS2T2Docs
                 if (soundIn.RecordingState == RecordingState.Stopped)
                 {
                     soundIn.Start();
-                    label1.Invoke(new Action(() => { label1.Text = "recordingstate is stopped"; }));
+                    label1.Text = "recordingstate is stopped";
                     //System.Threading.Thread.Sleep(2000);
                 }
                 if (sttEngine == null)
@@ -1363,10 +1548,9 @@ namespace AdamS2T2Docs
 
                 if (sttEngine.State != SttConnectionState.Open)
                 {
-                    Task taskA = sttEngine.StartAsync(language);
-                    taskA.Wait();
+                    await sttEngine.StartAsync(language);
 
-                    label1.Invoke(new Action(() => { label1.Text = "recordingstate is stopped and speech engine opened"; }));
+                    label1.Text = "recordingstate is stopped and speech engine opened";
                 }
 
                 //mySqlConnection = new MySqlConnection(connectSqlString);
@@ -1384,6 +1568,8 @@ namespace AdamS2T2Docs
 
                 startRecordButton.Enabled = false;
                 stopRecordButton.Enabled = true;
+                _isRecordingSessionActive = true;
+                sttProviderComboBox.Enabled = false;
                 timer1.Enabled = true;
                 myWatch = System.Diagnostics.Stopwatch.StartNew();
                 isGoogleError = false;
@@ -1392,9 +1578,12 @@ namespace AdamS2T2Docs
             } catch (Exception ex)
             {
                 // Log the exception and handle it as needed
-                Log.Error(ex, "An error occurred during button click");
+                Exception displayException = UnwrapException(ex);
+                Log.Error(displayException, "An error occurred during button click");
                 // Optionally, display an error message to the user
-                MessageBox.Show("An error occurred. Please contact support.");
+                MessageBox.Show(
+                    GetUserVisibleExceptionMessage(displayException),
+                    "Start Recording Error");
             }
 
 
@@ -1403,35 +1592,58 @@ namespace AdamS2T2Docs
 
         private async void stopRecord_Click(object sender, EventArgs e)
         {
+            if (_isStoppingRecordingSession)
+                return;
+
+            _isStoppingRecordingSession = true;
             stopRecordButton.Enabled = false;
             labelStatus.Text = "Stopping...";
 
-            if (soundIn.RecordingState == RecordingState.Recording)
-            {
-                label1.Invoke(new Action(() => { label1.Text = "recording state is Recording"; }));
-                soundIn.Stop();
-            }
-
-            if (sttEngine != null)
-                await sttEngine.StopAsync();
-
-            labelStatus.Text = "Stopping: flushing docs queue...";
-
             try
             {
-                await FlushPendingDocsBufferAsync();
+                if (soundIn.RecordingState == RecordingState.Recording)
+                {
+                    label1.Invoke(new Action(() => { label1.Text = "recording state is Recording"; }));
+                    soundIn.Stop();
+                }
+
+                if (sttEngine != null)
+                    await sttEngine.StopAsync();
+
+                _isRecordingSessionActive = false;
+                labelStatus.Text = "Stopping: flushing docs queue...";
+
+                try
+                {
+                    await FlushPendingDocsBufferAsync();
+                }
+                catch (Exception ex)
+                {
+                    File.AppendAllText("logs/googleErrors.txt",
+                        DateTime.Now + "\nStop flush failed:\n" +
+                        ex.Message + "\n" + ex.StackTrace + "\n\n");
+                }
             }
             catch (Exception ex)
             {
-                File.AppendAllText("logs/googleErrors.txt",
-                    DateTime.Now + "\nStop flush failed:\n" +
-                    ex.Message + "\n" + ex.StackTrace + "\n\n");
+                Exception displayException = UnwrapException(ex);
+                Log.Error(displayException, "An error occurred during stop recording");
+                MessageBox.Show(
+                    GetUserVisibleExceptionMessage(displayException),
+                    "Stop Recording Error",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
             }
-
-            audioSourceGroupBox.Visible = false;
-            stopRecordButton.Enabled = false;
-            startRecordButton.Enabled = true;
-            timer1.Enabled = false;
+            finally
+            {
+                _isRecordingSessionActive = false;
+                _isStoppingRecordingSession = false;
+                audioSourceGroupBox.Visible = false;
+                stopRecordButton.Enabled = false;
+                startRecordButton.Enabled = true;
+                sttProviderComboBox.Enabled = true;
+                timer1.Enabled = false;
+            }
         }
 
 
@@ -1756,6 +1968,34 @@ namespace AdamS2T2Docs
                 formCaption = new FormCaption();
                 formCaption.Show();
             }
+        }
+
+        private Exception UnwrapException(Exception ex)
+        {
+            AggregateException aggregate = ex as AggregateException;
+
+            while (aggregate != null &&
+                   aggregate.InnerExceptions.Count == 1 &&
+                   aggregate.InnerException != null)
+            {
+                ex = aggregate.InnerException;
+                aggregate = ex as AggregateException;
+            }
+
+            return ex;
+        }
+
+        private string GetUserVisibleExceptionMessage(Exception ex)
+        {
+            Exception displayException = UnwrapException(ex);
+
+            if (displayException.InnerException != null)
+            {
+                return displayException.Message + "\n\n" +
+                    displayException.InnerException.Message;
+            }
+
+            return displayException.Message;
         }
     }
 }
