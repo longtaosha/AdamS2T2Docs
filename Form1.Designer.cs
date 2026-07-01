@@ -57,6 +57,9 @@ namespace AdamS2T2Docs
             this.tabPage1 = new System.Windows.Forms.TabPage();
             this.tabPage2 = new System.Windows.Forms.TabPage();
             this.buttonCaption = new System.Windows.Forms.Button();
+            this.labelStatus = new System.Windows.Forms.Label();
+            this.proofreadProviderLabel = new System.Windows.Forms.Label();
+            this.proofreadProviderComboBox = new System.Windows.Forms.ComboBox();
             this.audioSourceGroupBox.SuspendLayout();
             this.groupBox1.SuspendLayout();
             this.languageGroupBox.SuspendLayout();
@@ -395,11 +398,49 @@ namespace AdamS2T2Docs
             this.buttonCaption.UseVisualStyleBackColor = true;
             this.buttonCaption.Click += new System.EventHandler(this.buttonCaption_Click);
             // 
+            // labelStatus
+            // 
+            this.labelStatus.AutoSize = true;
+            this.labelStatus.ForeColor = System.Drawing.SystemColors.HotTrack;
+            this.labelStatus.Location = new System.Drawing.Point(552, 82);
+            this.labelStatus.Margin = new System.Windows.Forms.Padding(1, 0, 1, 0);
+            this.labelStatus.Name = "labelStatus";
+            this.labelStatus.Size = new System.Drawing.Size(24, 13);
+            this.labelStatus.TabIndex = 25;
+            this.labelStatus.Text = "Idle";
+            // 
+            // proofreadProviderLabel
+            //
+            this.proofreadProviderLabel.AutoSize = true;
+            this.proofreadProviderLabel.Location = new System.Drawing.Point(357, 84);
+            this.proofreadProviderLabel.Margin = new System.Windows.Forms.Padding(1, 0, 1, 0);
+            this.proofreadProviderLabel.Name = "proofreadProviderLabel";
+            this.proofreadProviderLabel.Size = new System.Drawing.Size(92, 13);
+            this.proofreadProviderLabel.TabIndex = 26;
+            this.proofreadProviderLabel.Text = "AI Proofreading:";
+            // proofreadProviderComboBox
+            //
+            this.proofreadProviderComboBox.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.proofreadProviderComboBox.FormattingEnabled = true;
+            this.proofreadProviderComboBox.Items.AddRange(new object[] {
+            "Qwen",
+            "OpenAI",
+            "No PR."});
+            this.proofreadProviderComboBox.Location = new System.Drawing.Point(452, 80);
+            this.proofreadProviderComboBox.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
+            this.proofreadProviderComboBox.Name = "proofreadProviderComboBox";
+            this.proofreadProviderComboBox.Size = new System.Drawing.Size(88, 21);
+            this.proofreadProviderComboBox.TabIndex = 27;
+            this.proofreadProviderComboBox.SelectedIndexChanged += new System.EventHandler(this.proofreadProviderComboBox_SelectedIndexChanged);
+            //
             // Form1
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(793, 497);
+            this.ClientSize = new System.Drawing.Size(827, 490);
+            this.Controls.Add(this.proofreadProviderComboBox);
+            this.Controls.Add(this.proofreadProviderLabel);
+            this.Controls.Add(this.labelStatus);
             this.Controls.Add(this.buttonCaption);
             this.Controls.Add(this.audioSourceGroupBox);
             this.Controls.Add(this.tabControl1);
@@ -465,6 +506,9 @@ namespace AdamS2T2Docs
         private System.Windows.Forms.TabPage tabPage1;
         private System.Windows.Forms.TabPage tabPage2;
         private System.Windows.Forms.Button buttonCaption;
+        private System.Windows.Forms.Label labelStatus;
+        private System.Windows.Forms.Label proofreadProviderLabel;
+        private System.Windows.Forms.ComboBox proofreadProviderComboBox;
     }
 }
 
