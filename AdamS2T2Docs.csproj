@@ -293,17 +293,20 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AudioPlayChecker.cs" />
+    <Compile Include="AzureOpenAiProofreader.cs" />
     <Compile Include="FormCaption.cs">
       <SubType>Form</SubType>
     </Compile>
     <Compile Include="FormCaption.Designer.cs">
       <DependentUpon>FormCaption.cs</DependentUpon>
     </Compile>
+    <Compile Include="ISttEngine.cs" />
     <Compile Include="QwenProofreader.cs" />
     <Compile Include="WinTeamDataSet.cs" />
     <Compile Include="SilenceGenerator.cs" />
     <Compile Include="ConnectToGoogle.cs" />
     <Compile Include="ResultAnalysis.cs" />
+    <Compile Include="XfyunSttEngine.cs" />
     <Compile Include="XfyunData.cs" />
     <Compile Include="XunFeiEncription.cs" />
     <Compile Include="Form1.cs">

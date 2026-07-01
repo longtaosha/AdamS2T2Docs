@@ -9,13 +9,19 @@ using Newtonsoft.Json.Linq;
 
 namespace AdamS2T2Docs
 {
+    public interface IProofreader
+    {
+        string ProviderName { get; }
+        Task<ProofreadResult> ProofreadAsync(string text, string context = "");
+    }
+
     public class ProofreadResult
     {
         public string CorrectedText { get; set; } = "";
         public double Confidence { get; set; } = 1.0;
         public bool NeedMoreContext { get; set; } = false;
     }
-    public class QwenProofreader
+    public class QwenProofreader : IProofreader
     {
         private readonly string _apiKey;
         private readonly string _baseUrl;
@@ -27,6 +33,8 @@ namespace AdamS2T2Docs
 
         private readonly string _contextFile =
             @"prompts/qwen-proofread-context.txt";
+
+        public string ProviderName { get { return "Qwen"; } }
 
         public QwenProofreader(string apiKey, string baseUrl, string model)
         {
@@ -94,12 +102,15 @@ namespace AdamS2T2Docs
 
 
             if (string.IsNullOrWhiteSpace(_apiKey) || string.IsNullOrWhiteSpace(_baseUrl))
+            {
+                LogError("Configuration skipped: qwenApiKey or qwenBaseUrl is empty.");
                 return new ProofreadResult
                 {
                     CorrectedText = text,
-                    Confidence = 1.0,
+                    Confidence = 0.0,
                     NeedMoreContext = false
                 };
+            }
 
             string contextBlock = string.IsNullOrWhiteSpace(context)
     ? "No prior context."
@@ -161,24 +172,32 @@ namespace AdamS2T2Docs
                     string responseText = await response.Content.ReadAsStringAsync();
 
                     if (!response.IsSuccessStatusCode)
+                    {
+                        File.AppendAllText(
+                            "logs/qwen-proofread-errors.txt",
+                            DateTime.Now + "\nHTTP " + (int)response.StatusCode + "\n" + responseText + "\n\n");
                         return new ProofreadResult
                         {
                             CorrectedText = text,
                             Confidence = 0.0,
                             NeedMoreContext = false
                         };
+                    }
 
                     JObject obj = JObject.Parse(responseText);
 
                     string result = obj["choices"]?[0]?["message"]?["content"]?.ToString();
 
                     if (string.IsNullOrWhiteSpace(result))
+                    {
+                        LogError("Empty content in Qwen response:\n" + responseText);
                         return new ProofreadResult
                         {
                             CorrectedText = text,
                             Confidence = 0.0,
                             NeedMoreContext = false
                         };
+                    }
 
                     result = result.Trim();
 
@@ -207,6 +226,14 @@ namespace AdamS2T2Docs
                     };
                 }
             }
+        }
+
+        private void LogError(string message)
+        {
+            Directory.CreateDirectory("logs");
+            File.AppendAllText(
+                "logs/qwen-proofread-errors.txt",
+                DateTime.Now + "\n" + message + "\n\n");
         }
     }
 }
