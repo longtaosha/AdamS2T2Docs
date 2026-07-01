@@ -424,7 +424,8 @@ namespace AdamS2T2Docs
             this.proofreadProviderComboBox.FormattingEnabled = true;
             this.proofreadProviderComboBox.Items.AddRange(new object[] {
             "Qwen",
-            "OpenAI"});
+            "OpenAI",
+            "No PR."});
             this.proofreadProviderComboBox.Location = new System.Drawing.Point(452, 80);
             this.proofreadProviderComboBox.Margin = new System.Windows.Forms.Padding(2, 2, 2, 2);
             this.proofreadProviderComboBox.Name = "proofreadProviderComboBox";

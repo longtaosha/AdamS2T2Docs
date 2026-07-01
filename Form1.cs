@@ -773,7 +773,7 @@ namespace AdamS2T2Docs
             {
                 richTextBox1.Invoke(new Action(() =>
                 {
-                    richTextBox1.AppendText(e.Message);
+                    richTextBox1.AppendText(e.Message + "\n");
                 }));
             }
 
@@ -804,7 +804,11 @@ namespace AdamS2T2Docs
             Directory.CreateDirectory("logs");
             string provider = NormalizeProofreadProvider(proofreadProvider);
 
-            if (provider == "openai")
+            if (provider == "none")
+            {
+                aiProofreader = null;
+            }
+            else if (provider == "openai")
             {
                 aiProofreader = new AzureOpenAiProofreader(
                     azureOpenAiApiKey,
@@ -824,7 +828,7 @@ namespace AdamS2T2Docs
 
             File.AppendAllText("logs/proofread-provider.txt",
                 DateTime.Now + " provider=" + proofreadProvider +
-                " name=" + aiProofreader.ProviderName + "\n");
+                " name=" + (aiProofreader == null ? "No proofreading" : aiProofreader.ProviderName) + "\n");
         }
 
         private string NormalizeProofreadProvider(string provider)
@@ -833,6 +837,16 @@ namespace AdamS2T2Docs
                 return "qwen";
 
             provider = provider.Trim().ToLowerInvariant();
+
+            if (provider == "none" || provider == "no" ||
+                provider == "off" || provider == "disabled" ||
+                provider == "raw" || provider == "no proofreading" ||
+                provider == "noproofreading" || provider == "no_proofreading" ||
+                provider == "no pr." || provider == "no pr" ||
+                provider == "nopr" || provider == "no_pr")
+            {
+                return "none";
+            }
 
             if (provider == "azure" || provider == "azureopenai" ||
                 provider == "azure_openai" || provider == "openai")
@@ -849,7 +863,11 @@ namespace AdamS2T2Docs
                 return;
 
             string provider = NormalizeProofreadProvider(proofreadProvider);
-            string selectedItem = provider == "openai" ? "OpenAI" : "Qwen";
+            string selectedItem = "Qwen";
+            if (provider == "openai")
+                selectedItem = "OpenAI";
+            else if (provider == "none")
+                selectedItem = "No PR.";
 
             if (proofreadProviderComboBox.Items.Contains(selectedItem))
                 proofreadProviderComboBox.SelectedItem = selectedItem;
@@ -891,8 +909,11 @@ namespace AdamS2T2Docs
             string selectedProvider = proofreadProviderComboBox.SelectedItem.ToString();
             string normalizedProvider = NormalizeProofreadProvider(selectedProvider);
 
-            if (normalizedProvider == proofreadProvider && aiProofreader != null)
+            if (normalizedProvider == proofreadProvider &&
+                (normalizedProvider == "none" || aiProofreader != null))
+            {
                 return;
+            }
 
             proofreadProvider = normalizedProvider;
             InitializeProofreader();
@@ -901,7 +922,7 @@ namespace AdamS2T2Docs
         private string GetProofreadDocsLogLabel(IProofreader proofreader)
         {
             if (proofreader == null)
-                return "DOCS_AI";
+                return "DOCS_NO_AI";
 
             string providerName = proofreader.ProviderName ?? "";
             if (providerName.Equals("Qwen", StringComparison.OrdinalIgnoreCase))
@@ -927,14 +948,15 @@ namespace AdamS2T2Docs
         {
             string suffix = isDirect ? "_DIRECT" : "";
             string providerLabel = GetProofreadDocsLogLabel(proofreader) + suffix;
+            bool proofreadSkipped = proofreader == null;
             bool proofreadSucceeded = IsProofreadSuccessful(proofreadResult);
 
             string logText =
                 DateTime.Now + "\n" +
                 "DOCS_RAW" + suffix + ": " + rawText + "\n" +
-                providerLabel + ": " + (proofreadSucceeded ? docsText : "") + "\n";
+                providerLabel + ": " + ((proofreadSucceeded || proofreadSkipped) ? docsText : "") + "\n";
 
-            if (!proofreadSucceeded)
+            if (!proofreadSucceeded && !proofreadSkipped)
             {
                 logText +=
                     "DOCS_AI_STATUS" + suffix + ": FAILED_OR_SKIPPED\n" +
