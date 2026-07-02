@@ -21,7 +21,7 @@ using System.Text.RegularExpressions;
 
 namespace AdamS2T2Docs
 {
-    class ConnectToGoogle
+    class ConnectToGoogle : IDisposable
     {// If modifying these scopes, delete your previously saved credentials folder at bin/Debug/token.json         
         static string[] Scopes = { DocsService.Scope.Documents };
         static string ApplicationName = "Adam's S2T2Googldocs";
@@ -1873,6 +1873,45 @@ namespace AdamS2T2Docs
 
             }
 
+        }
+
+        public void Dispose()
+        {
+            try
+            {
+                if (streamForST != null)
+                {
+                    streamForST.Dispose();
+                    streamForST = null;
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                if (clientForST != null)
+                {
+                    clientForST.Close();
+                    clientForST = null;
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                if (service != null)
+                {
+                    service.Dispose();
+                    service = null;
+                }
+            }
+            catch
+            {
+            }
         }
 
     }

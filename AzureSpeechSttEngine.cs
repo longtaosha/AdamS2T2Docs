@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using Microsoft.CognitiveServices.Speech;
 using Microsoft.CognitiveServices.Speech.Audio;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
 
@@ -50,6 +51,7 @@ namespace AdamS2T2Docs
         {
             await StopAsync().ConfigureAwait(false);
             EnsureConfigured();
+            EnsureNativeRuntimeAvailable();
 
             SpeechConfig speechConfig = CreateSpeechConfig();
             _activeLanguage = ResolveLanguage(language);
@@ -166,7 +168,25 @@ namespace AdamS2T2Docs
                 return;
 
             _disposed = true;
-            StopAsync().GetAwaiter().GetResult();
+
+            try
+            {
+                Task stopTask = StopAsync();
+                if (!stopTask.Wait(TimeSpan.FromSeconds(3)))
+                {
+                    WriteLog(
+                        "logs/azure-stt-errors.txt",
+                        "Azure Speech dispose timed out while stopping recognition.");
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog("logs/azure-stt-errors.txt", ex.ToString());
+            }
+            finally
+            {
+                CloseAudioObjects();
+            }
         }
 
         private SpeechConfig CreateSpeechConfig()
@@ -190,6 +210,55 @@ namespace AdamS2T2Docs
                 throw new InvalidOperationException("Azure Speech region or endpoint is not configured.");
 
             ResolveVadMs(_vadMs);
+        }
+
+        private void EnsureNativeRuntimeAvailable()
+        {
+            string appDir = AppDomain.CurrentDomain.BaseDirectory;
+            string systemDir = Environment.SystemDirectory;
+            List<string> missing = new List<string>();
+
+            string[] speechNativeDlls =
+            {
+                "Microsoft.CognitiveServices.Speech.core.dll",
+                "Microsoft.CognitiveServices.Speech.extension.audio.sys.dll",
+                "Microsoft.CognitiveServices.Speech.extension.codec.dll",
+                "Microsoft.CognitiveServices.Speech.extension.kws.dll",
+                "Microsoft.CognitiveServices.Speech.extension.kws.ort.dll"
+            };
+
+            foreach (string dllName in speechNativeDlls)
+            {
+                if (!File.Exists(Path.Combine(appDir, dllName)))
+                    missing.Add(dllName);
+            }
+
+            string[] vcRuntimeDlls =
+            {
+                "MSVCP140.dll",
+                "MSVCP140_CODECVT_IDS.dll",
+                "VCRUNTIME140.dll",
+                "VCRUNTIME140_1.dll"
+            };
+
+            foreach (string dllName in vcRuntimeDlls)
+            {
+                if (!File.Exists(Path.Combine(appDir, dllName)) &&
+                    !File.Exists(Path.Combine(systemDir, dllName)))
+                {
+                    missing.Add(dllName);
+                }
+            }
+
+            if (missing.Count == 0)
+                return;
+
+            throw new InvalidOperationException(
+                "Azure Speech native runtime is incomplete. Missing: " +
+                string.Join(", ", missing) +
+                "\n\nFor a release zip, include all Microsoft.CognitiveServices.Speech*.dll files from the Release folder. " +
+                "On the target machine, install Microsoft Visual C++ 2015-2022 Redistributable (x64): " +
+                "https://aka.ms/vs/17/release/vc_redist.x64.exe");
         }
 
         private string ResolveLanguage(string requestedLanguage)

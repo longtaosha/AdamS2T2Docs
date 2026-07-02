@@ -377,6 +377,12 @@
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="packages\Grpc.Core.2.46.3\build\net45\Grpc.Core.targets" Condition="Exists('packages\Grpc.Core.2.46.3\build\net45\Grpc.Core.targets')" />
   <Import Project="packages\Microsoft.CognitiveServices.Speech.1.50.0\build\net462\Microsoft.CognitiveServices.Speech.targets" Condition="Exists('packages\Microsoft.CognitiveServices.Speech.1.50.0\build\net462\Microsoft.CognitiveServices.Speech.targets')" />
+  <Target Name="CopyAzureSpeechNativeRuntime" AfterTargets="Build">
+    <ItemGroup>
+      <AzureSpeechNativeRuntime Include="$(MSBuildProjectDirectory)\packages\Microsoft.CognitiveServices.Speech.1.50.0\runtimes\win-x64\native\Microsoft.CognitiveServices.Speech*.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AzureSpeechNativeRuntime)" DestinationFolder="$(TargetDir)" SkipUnchangedFiles="true" />
+  </Target>
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>

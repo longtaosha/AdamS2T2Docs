@@ -109,6 +109,9 @@ namespace AdamS2T2Docs
         private static readonly System.Timers.Timer aTimer;
         private static System.Diagnostics.Stopwatch myWatch;
         private System.Timers.Timer gTimer;
+        private System.Windows.Forms.Timer _monitorTimer;
+        private bool _isClosing;
+        private bool _cleanupStarted;
         private bool isGoogleError = false;
         private bool isOutputGoogleJustFinalResult = true;
 
@@ -128,6 +131,7 @@ namespace AdamS2T2Docs
             try
             {
                 InitializeComponent();
+                FormClosing += Form1_FormClosing;
                 loadApiKey();
                 InitializeSttEngine();
                 ApplySttProviderSelection();
@@ -146,10 +150,13 @@ namespace AdamS2T2Docs
                 soundIn.Stopped += OnSoundInStopped;
                 connectToGoogle.OnTextCopied += outputWordToUI;
 
-                System.Windows.Forms.Timer monitorTimer = new System.Windows.Forms.Timer();
-                monitorTimer.Interval = 1000;
-                monitorTimer.Tick += (s, e) =>
+                _monitorTimer = new System.Windows.Forms.Timer();
+                _monitorTimer.Interval = 1000;
+                _monitorTimer.Tick += (s, e) =>
                 {
+                    if (_isClosing || IsDisposed)
+                        return;
+
                     string stage;
                     DateTime start;
                     int queueCount;
@@ -181,7 +188,10 @@ namespace AdamS2T2Docs
                     }
 
                     // auto restart worker if queue exists
-                    if (useGoogleDocsQueue && queueCount > 0 && !_isGoogleDocsWorkerRunning)
+                    if (!_isClosing &&
+                        useGoogleDocsQueue &&
+                        queueCount > 0 &&
+                        !_isGoogleDocsWorkerRunning)
                     {
                         _ = ProcessGoogleDocsQueueAsync();
                     }
@@ -189,7 +199,8 @@ namespace AdamS2T2Docs
                     // idle flush:
                     // if no new final seg for several seconds,
                     // flush remaining docs buffer into queue
-                    if (!string.IsNullOrWhiteSpace(_googleDocsProofreadBuffer) &&
+                    if (!_isClosing &&
+                        !string.IsNullOrWhiteSpace(_googleDocsProofreadBuffer) &&
                         _lastFinalSegmentTime != DateTime.MinValue &&
                         (DateTime.Now - _lastFinalSegmentTime).TotalSeconds >= googleDocsIdleFlushSeconds)
                     {
@@ -231,7 +242,7 @@ namespace AdamS2T2Docs
                     }
                 };
 
-                monitorTimer.Start();
+                _monitorTimer.Start();
 
             }
             catch (Exception ex)
@@ -278,6 +289,9 @@ namespace AdamS2T2Docs
 
         private void SoundInSource_DataAvailable(object sender, DataAvailableEventArgs e)
         {
+            if (_isClosing)
+                return;
+
             if (sttEngine == null || sttEngine.State != SttConnectionState.Open)
                 return;
 
@@ -1158,6 +1172,9 @@ namespace AdamS2T2Docs
 
         private async Task SendDocsTextDirectlyAsync(string docsRawText)
         {
+            if (_isClosing)
+                return;
+
             if (string.IsNullOrWhiteSpace(docsRawText))
                 return;
 
@@ -1237,14 +1254,14 @@ namespace AdamS2T2Docs
 
         private async Task ProcessGoogleDocsQueueAsync()
         {
-            if (_isGoogleDocsWorkerRunning)
+            if (_isClosing || _isGoogleDocsWorkerRunning)
                 return;
 
             _isGoogleDocsWorkerRunning = true;
 
             try
             {
-                while (true)
+                while (!_isClosing)
                 {
                     string docsRawText = null;
 
@@ -1340,9 +1357,12 @@ namespace AdamS2T2Docs
                     }
                     catch (Exception ex)
                     {
-                        lock (_pendingGoogleDocsQueueLock)
+                        if (!_isClosing)
                         {
-                            _pendingGoogleDocsQueue.AddFirst(docsRawText);
+                            lock (_pendingGoogleDocsQueueLock)
+                            {
+                                _pendingGoogleDocsQueue.AddFirst(docsRawText);
+                            }
                         }
 
                         File.AppendAllText("logs/googleErrors.txt",
@@ -1718,24 +1738,167 @@ namespace AdamS2T2Docs
 
         private void Form1_FormClosed(object sender, FormClosedEventArgs e)
         {
-            try
+            ShutdownApplicationResources();
+
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            _isClosing = true;
+
+            if (timer1 != null)
+                timer1.Enabled = false;
+
+            if (_monitorTimer != null)
+                _monitorTimer.Stop();
+
+            stopgTimer();
+        }
+
+        private void ShutdownApplicationResources()
+        {
+            if (_cleanupStarted)
+                return;
+
+            _cleanupStarted = true;
+            _isClosing = true;
+
+            TryCleanup("timer1", () =>
             {
-                // Dispose of resources and close connections here
-                richTextBox1.Dispose();
+                if (timer1 != null)
+                    timer1.Enabled = false;
+            });
+
+            TryCleanup("monitorTimer", () =>
+            {
+                if (_monitorTimer != null)
+                {
+                    _monitorTimer.Stop();
+                    _monitorTimer.Dispose();
+                    _monitorTimer = null;
+                }
+            });
+
+            TryCleanup("wordCopyTimer", () => stopgTimer());
+
+            TryCleanup("wordCopyTask", () =>
+            {
+                if (connectToGoogle != null)
+                {
+                    connectToGoogle.isWordCopyShouldStop = true;
+                    connectToGoogle.isWordCopyIsDone = true;
+                }
+            });
+
+            TryCleanup("googleQueue", () =>
+            {
+                _googleDocsProofreadBuffer = "";
+                lock (_pendingGoogleDocsQueueLock)
+                {
+                    _pendingGoogleDocsQueue.Clear();
+                }
+            });
+
+            TryCleanup("soundIn", () =>
+            {
+                if (soundIn != null)
+                {
+                    soundIn.DataAvailable -= SoundIn_DataAvailable;
+                    soundIn.Stopped -= OnSoundInStopped;
+
+                    if (soundIn.RecordingState == RecordingState.Recording)
+                        soundIn.Stop();
+                }
+            });
+
+            TryCleanup("soundInSource", () =>
+            {
+                if (soundInSource != null)
+                {
+                    soundInSource.DataAvailable -= SoundInSource_DataAvailable;
+                    soundInSource.Dispose();
+                    soundInSource = null;
+                }
+            });
+
+            TryCleanup("convertedSource", () =>
+            {
+                if (convertedSource != null)
+                {
+                    convertedSource.Dispose();
+                    convertedSource = null;
+                }
+            });
+
+            TryCleanup("waveWriter", () =>
+            {
+                if (waveWriter != null)
+                {
+                    waveWriter.Dispose();
+                    waveWriter = null;
+                }
+            });
+
+            TryCleanup("soundInDispose", () =>
+            {
+                if (soundIn != null)
+                {
+                    soundIn.Dispose();
+                    soundIn = null;
+                }
+            });
+
+            TryCleanup("sttEngine", () =>
+            {
                 if (sttEngine != null)
                 {
-                    sttEngine.StopAsync().GetAwaiter().GetResult();
-                    sttEngine.Dispose();
+                    try
+                    {
+                        Task stopTask = sttEngine.StopAsync();
+                        stopTask.Wait(TimeSpan.FromSeconds(3));
+                    }
+                    finally
+                    {
+                        sttEngine.Dispose();
+                        sttEngine = null;
+                    }
                 }
-                // Dispose of other resources as needed
-            }
-            finally
-            {
-                // Close and flush the log
-                Log.CloseAndFlush();
-            }
-            this.Dispose();
+            });
 
+            TryCleanup("connectToGoogle", () =>
+            {
+                if (connectToGoogle != null)
+                {
+                    connectToGoogle.OnTextCopied -= outputWordToUI;
+                    connectToGoogle.Dispose();
+                    connectToGoogle = null;
+                }
+            });
+
+            TryCleanup("logs", () => Log.CloseAndFlush());
+
+            Application.ExitThread();
+        }
+
+        private void TryCleanup(string name, Action cleanup)
+        {
+            try
+            {
+                cleanup();
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    Directory.CreateDirectory("logs");
+                    File.AppendAllText(
+                        "logs/shutdown-errors.txt",
+                        DateTime.Now + " " + name + "\n" + ex + "\n\n");
+                }
+                catch
+                {
+                }
+            }
         }
 
         private void label2_Click(object sender, EventArgs e)
@@ -1745,6 +1908,9 @@ namespace AdamS2T2Docs
 
         private void timer1_Tick(object sender, EventArgs e)
         {
+            if (_isClosing)
+                return;
+
             if (soundIn.RecordingState == RecordingState.Stopped)
             {
                 soundIn.Start();
@@ -1780,6 +1946,8 @@ namespace AdamS2T2Docs
 
         private  void gTimedEventCopyWord(object sender, ElapsedEventArgs e)
         {
+            if (_isClosing || connectToGoogle == null)
+                return;
 
            
             if (connectToGoogle.isWordCopyIsDone)
@@ -1879,7 +2047,10 @@ namespace AdamS2T2Docs
         }
         // Start the word copy task
         private async void StartWordCopyTask()
-        {            
+        {
+            if (_isClosing || connectToGoogle == null)
+                return;
+
            connectToGoogle.isWordCopyShouldStop = false;
 
             if (!isGoogleError)
@@ -1920,6 +2091,9 @@ namespace AdamS2T2Docs
 
         private void outputWordToUI (string text)
         {
+            if (_isClosing || IsDisposed)
+                return;
+
             //output copied word to UI
 
             if (InvokeRequired)
